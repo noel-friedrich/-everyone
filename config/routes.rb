@@ -11,5 +11,6 @@ Rails.application.routes.draw do
 
   # Defines the root path route ("/")
   root "home#index"
+  get "studio" => "studio#index", as: :studio
   post "initiate_call" => "home#initiate_call", as: :initiate_call
 end

@@ -52,6 +52,10 @@ body {
     filter: drop-shadow(5px 5px 5px rgba(0, 0, 0, 0.3));
 }
 
+.logo--studio {
+    z-index: 0;
+}
+
 .landing {
     width: 100%;
     margin: 0;
@@ -178,6 +182,148 @@ body {
     color: #111111;
 }
 
+.studio-page {
+    width: min(100%, 980px);
+    margin: 0 auto;
+    padding: 4.4rem 1.25rem 3rem;
+    position: relative;
+    z-index: 2;
+}
+
+.studio-top h1 {
+    margin: 0;
+    font-size: clamp(2rem, 7vw, 3rem);
+    letter-spacing: -0.02em;
+}
+
+.studio-top p {
+    margin: 0.85rem 0 1.5rem;
+    max-width: 46rem;
+    color: #333333;
+}
+
+.studio-alert-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+}
+
+.studio-alert-chip {
+    border: 1px solid #1a1a1a;
+    border-radius: 999px;
+    padding: 0.62rem 1rem;
+    background: #ffffff;
+    color: #111111;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.studio-alert-chip.is-primary {
+    border: none;
+    background: #d90808;
+    color: #ffffff;
+    box-shadow: 0 10px 24px rgba(217, 8, 8, 0.33);
+}
+
+.studio-table-shell {
+    margin-top: 2rem;
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.14);
+    overflow: hidden;
+}
+
+.studio-table-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.05rem 1.2rem;
+    border-bottom: 1px solid #e6e6e6;
+}
+
+.studio-table-head h2 {
+    margin: 0;
+    font-size: 1.15rem;
+}
+
+.studio-add {
+    border: 1px solid #111111;
+    border-radius: 999px;
+    padding: 0.6rem 1rem;
+    background: #111111;
+    color: #ffffff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.studio-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.studio-table {
+    width: 100%;
+    min-width: 640px;
+    border-collapse: collapse;
+}
+
+.studio-table th,
+.studio-table td {
+    padding: 0.9rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid #efefef;
+    vertical-align: middle;
+}
+
+.studio-table th {
+    font-size: 0.84rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #555555;
+}
+
+.studio-status {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.26rem 0.64rem;
+    font-size: 0.84rem;
+    font-weight: 600;
+}
+
+.studio-status.is-confirmed {
+    background: #e7f9ed;
+    color: #1d6e38;
+}
+
+.studio-status.is-pending {
+    background: #f3f3f3;
+    color: #3c3c3c;
+}
+
+.studio-actions {
+    display: flex;
+    gap: 0.45rem;
+}
+
+.studio-action-btn {
+    border: 1px solid #111111;
+    border-radius: 0.45rem;
+    padding: 0.36rem 0.66rem;
+    background: #ffffff;
+    color: #111111;
+    font: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.studio-action-btn.is-danger {
+    border-color: #b31212;
+    color: #b31212;
+}
+
 @media only screen and (max-width: 800px) {
     .landing {
         margin-top: 4rem;
@@ -207,5 +353,14 @@ body {
 
     .circle-form-panel__pad {
         padding: 14px 10px 10px;
+    }
+
+    .studio-page {
+        padding: 3.6rem 0.75rem 2rem;
+    }
+
+    .studio-table-head {
+        align-items: start;
+        flex-direction: column;
     }
 }
