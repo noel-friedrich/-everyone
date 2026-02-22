@@ -83,11 +83,15 @@ body {
 }
 
 .landing__cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border: 1px solid #111111;
     border-radius: 999px;
     padding: 0.75rem 1.1rem;
     background: #111111;
     color: #ffffff;
+    text-decoration: none;
     font: inherit;
     font-weight: 600;
     cursor: pointer;
@@ -99,76 +103,88 @@ body {
     color: #111111;
 }
 
-.circle-form-panel {
-    width: min(624px, calc(100% - 2rem));
-    margin: 1rem auto 0;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(-10px);
-    transition:
-        transform 420ms cubic-bezier(0.2, 0.8, 0.2, 1),
-        opacity 260ms ease;
+.landing-sections {
+    width: min(100%, 980px);
+    margin-top: 2rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
 }
 
-.circle-form-panel.is-open {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateY(0);
-}
-
-.circle-form-panel__inner {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.circle-form-panel.is-open .circle-form-panel__inner {
-    max-height: 1400px;
-}
-
-.circle-form-panel__pad {
-    padding: 30px;
-}
-
-.circle-form-card {
-    width: 100%;
+.landing-card {
     background: #ffffff;
-    border: none;
     border-radius: 1rem;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
-    padding: 1.2rem;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.14);
+    padding: 1.1rem 1.15rem;
 }
 
-.circle-form-card h2 {
-    margin: 0 0 0.8rem;
+.landing-card h2 {
+    margin: 0;
     font-size: 1.2rem;
 }
 
-.circle-form {
-    display: grid;
-    gap: 0.55rem;
+.landing-card p {
+    margin: 0.7rem 0 0;
+    font-size: 0.96rem;
+    color: #2f2f2f;
 }
 
-.circle-form label {
+.landing-faq {
+    margin-top: 0.75rem;
+    display: grid;
+    gap: 0.7rem;
+}
+
+.landing-faq__item {
+    border: 1px solid #ededed;
+    border-radius: 0.8rem;
+    background: #fafafa;
+    padding: 0.68rem 0.75rem;
+}
+
+.landing-faq__item h3 {
+    margin: 0;
+    font-size: 0.96rem;
+}
+
+.landing-faq__item p {
+    margin: 0.42rem 0 0;
+    font-size: 0.9rem;
+    color: #363636;
+}
+
+.landing-contact-form {
+    margin-top: 0.8rem;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.landing-contact-form label {
     font-size: 0.9rem;
     font-weight: 500;
 }
 
-.circle-form input {
+.landing-contact-form input,
+.landing-contact-form textarea {
     width: 100%;
     border: 1px solid #1a1a1a;
     border-radius: 0.45rem;
-    padding: 0.62rem 0.7rem;
+    padding: 0.58rem 0.65rem;
     font: inherit;
     background: #ffffff;
     color: #111111;
 }
 
-.circle-form__submit {
-    margin-top: 0.35rem;
+.landing-contact-form textarea {
+    resize: vertical;
+    min-height: 6rem;
+}
+
+.landing-contact-form__submit {
+    margin-top: 0.2rem;
     border: 1px solid #111111;
     border-radius: 999px;
-    padding: 0.72rem 1rem;
+    padding: 0.68rem 0.95rem;
     background: #111111;
     color: #ffffff;
     font: inherit;
@@ -176,8 +192,8 @@ body {
     cursor: pointer;
 }
 
-.circle-form__submit:hover,
-.circle-form__submit:focus-visible {
+.landing-contact-form__submit:hover,
+.landing-contact-form__submit:focus-visible {
     background: #ffffff;
     color: #111111;
 }
@@ -469,6 +485,15 @@ body {
     padding: 1rem 1rem 0.45rem;
 }
 
+.alert-controls .studio-alert-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
+}
+
 .alert-trigger {
     min-width: 8rem;
     text-align: center;
@@ -596,6 +621,45 @@ body {
     will-change: transform;
 }
 
+.alert-help-card {
+    margin-top: 1rem;
+}
+
+.alert-help-card__inner {
+    padding: 1rem 1.05rem 1.1rem;
+}
+
+.alert-help-card__inner h2 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.alert-help-card__inner h3 {
+    margin: 1rem 0 0.5rem;
+    font-size: 1rem;
+}
+
+.alert-help-card__inner p {
+    margin: 0.55rem 0 0;
+    color: #2f2f2f;
+    line-height: 1.45;
+}
+
+.alert-help-card__inner ul {
+    margin: 0.45rem 0 0;
+    padding-left: 1.1rem;
+}
+
+.alert-help-card__inner li {
+    margin: 0.4rem 0;
+    line-height: 1.45;
+    color: #222222;
+}
+
+.alert-help-card__inner a {
+    color: #111111;
+}
+
 @media only screen and (max-width: 800px) {
     .landing {
         margin-top: 4rem;
@@ -613,18 +677,9 @@ body {
         width: 100%;
     }
 
-    .circle-form-card {
-        width: 100%;
-        max-width: none;
-        border-radius: 0.9rem;
-    }
-
-    .circle-form-panel {
-        width: 100%;
-    }
-
-    .circle-form-panel__pad {
-        padding: 14px 10px 10px;
+    .landing-sections {
+        grid-template-columns: 1fr;
+        gap: 0.8rem;
     }
 
     .studio-page {
@@ -642,18 +697,15 @@ body {
 
     .alert-controls {
         width: 100%;
-        align-items: center;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: stretch;
+        gap: 0.55rem;
     }
 
-    .alert-intake {
-        margin-left: 0.75rem;
-        margin-right: 0.75rem;
-    }
-
-    .alert-intake__head {
-        align-items: flex-start;
-        flex-direction: column;
+    .alert-controls .studio-alert-chip {
+        width: 100%;
+        min-width: 0;
     }
 
     .alert-stage {

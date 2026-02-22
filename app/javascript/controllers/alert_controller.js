@@ -1060,11 +1060,17 @@ export default class extends Controller {
     });
   }
 
+  updateAlertButtonLabel(total) {
+    const suffix = total === 1 ? "" : "S";
+    this.alertButtonTarget.textContent = `CALL ${total} CONTACT${suffix}`;
+  }
+
   render() {
     const total = this.contacts.length;
     const hasActive = this.contacts.some((c) =>
       ACTIVE_CALL_STATUSES.has(c.callStatus),
     );
+    this.updateAlertButtonLabel(total);
 
     if (total === 0) {
       this.alertButtonTarget.disabled = this.demoMode;

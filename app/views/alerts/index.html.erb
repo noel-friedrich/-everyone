@@ -46,7 +46,7 @@
                 data-alert-target="alertButton"
                 data-action="click->alert#startAlert"
             >
-                ALERT
+                CALL CONTACTS
             </button>
             <button
                 type="button"
@@ -57,6 +57,12 @@
             >
                 Cancel
             </button>
+            <button type="button" class="studio-alert-chip">
+                Emergency Contacts
+            </button>
+            <a href="/studio" class="studio-alert-chip">
+                Manage Contacts
+            </a>
         </div>
 
         <div class="alert-meta">
@@ -104,6 +110,141 @@
                 </thead>
                 <tbody data-alert-target="tbody"></tbody>
             </table>
+        </div>
+    </section>
+
+    <section class="studio-table-shell alert-help-card">
+        <div class="alert-help-card__inner">
+            <h2>Mental health support in Ireland (and Dublin)</h2>
+            <p>
+                If you or someone else is in <strong>immediate danger</strong>,
+                call
+                <a href="tel:999"><strong>999</strong></a>
+                /
+                <a href="tel:112"><strong>112</strong></a>
+                or go to the nearest
+                <strong>A&amp;E</strong>.
+            </p>
+            <p>
+                More info:
+                <a href="https://www.mhcirl.ie/help-and-advice/urgent-help-and-support">mhcirl.ie urgent help</a>
+                and
+                <a href="https://www2.hse.ie/mental-health/services-support/get-urgent-help/">HSE urgent help</a>.
+            </p>
+
+            <h3>Ireland-wide (national) crisis support</h3>
+            <ul>
+                <li>
+                    <strong>Samaritans (24/7, listening support):</strong>
+                    <a href="tel:116123"><strong>116 123</strong></a>
+                    (freephone) -
+                    <a href="https://www.samaritans.org/samaritans-ireland/about/governance-and-structure/contact-us/">samaritans.org</a>
+                </li>
+                <li>
+                    <strong>Pieta (24/7, suicide/self-harm crisis):</strong>
+                    <a href="tel:1800247247"><strong>1800 247 247</strong></a>
+                    (freephone) or
+                    <a href="sms:51444"><strong>text HELP to 51444</strong></a>
+                    -
+                    <a href="https://www.pieta.ie/how-we-can-help/helpline/">pieta.ie helpline</a>
+                    (<a href="https://www.pieta.ie/contact/">contact</a>)
+                </li>
+                <li>
+                    <strong>Text About It / spunout (24/7 text support):</strong>
+                    text <a href="sms:50808"><strong>TALK to 50808</strong></a>
+                    (free) -
+                    <a href="https://www.textaboutit.ie/">textaboutit.ie</a>
+                </li>
+                <li>
+                    <strong>HSE "Your Mental Health" Information Line (24/7 info &amp; signposting):</strong>
+                    <a href="tel:1800111888"><strong>1800 111 888</strong></a>
+                    -
+                    <a href="https://www2.hse.ie/mental-health/services-support/your-mental-health-information-line/">hse.ie info line</a>
+                </li>
+            </ul>
+
+            <h3>Ireland-wide (national) mental health support (non-emergency)</h3>
+            <ul>
+                <li>
+                    <strong>Aware (depression/bipolar; support line):</strong>
+                    <a href="tel:1800804848"><strong>1800 80 48 48</strong></a>
+                    (daily 10am-10pm) -
+                    <a href="https://www.aware.ie/">aware.ie</a>
+                </li>
+                <li>
+                    <strong>Childline (under 18s; 24/7):</strong>
+                    <a href="tel:1800666666"><strong>1800 66 66 66</strong></a>
+                    (also online chat) -
+                    <a href="https://www.childline.ie/">childline.ie</a>
+                </li>
+                <li>
+                    <strong>LGBT Ireland (helpline):</strong>
+                    <a href="tel:1800929539"><strong>1800 929 539</strong></a>
+                    (see opening hours) -
+                    <a href="https://lgbt.ie/contact-us/">contact</a>
+                    |
+                    <a href="https://lgbt.ie/lgbt-helpline-opening-hours/">opening hours</a>
+                </li>
+                <li>
+                    <strong>Women's Aid (domestic abuse; 24/7):</strong>
+                    <a href="tel:1800341900"><strong>1800 341 900</strong></a>
+                    -
+                    <a href="https://www.womensaid.ie/about-us/contact-us/">womensaid.ie</a>
+                </li>
+                <li>
+                    <strong>Men's Aid Ireland (domestic abuse support for men):</strong>
+                    <a href="tel:015543811"><strong>01 554 3811</strong></a>
+                    -
+                    <a href="https://www.mensaid.ie/">mensaid.ie</a>
+                </li>
+                <li>
+                    <strong>Dublin Rape Crisis Centre (sexual violence; national 24-hour helpline):</strong>
+                    <a href="tel:1800778888"><strong>1800 77 8888</strong></a>
+                    -
+                    <a href="https://www.drcc.ie/services/helpline/">drcc.ie helpline</a>
+                </li>
+                <li>
+                    <strong>ALONE (loneliness/older people support line):</strong>
+                    <a href="tel:0818222024"><strong>0818 222 024</strong></a>
+                    -
+                    <a href="https://alone.ie/contact/">alone.ie/contact</a>
+                </li>
+                <li>
+                    <strong>SOSAD (24-hour helpline):</strong>
+                    <a href="tel:1800901909"><strong>1800 901 909</strong></a>
+                    -
+                    <a href="https://sosadireland.ie/contact-sosad-ireland-ie/">sosadireland.ie</a>
+                </li>
+            </ul>
+
+            <h3>Dublin-specific places you can contact</h3>
+            <ul>
+                <li>
+                    <strong>MyMind (counselling/psychotherapy; Rathmines HQ):</strong>
+                    <a href="tel:0818500800"><strong>0818 500 800</strong></a><br>
+                    137 Rathmines Road Lower, Dublin 6 (D06 V3Y8) -
+                    <a href="https://users.mymind.org/location/dublin-6">users.mymind.org</a>
+                </li>
+                <li>
+                    <strong>Jigsaw (free youth mental-health support, ages 12-25):</strong><br>
+                    Dublin City:
+                    <a href="tel:016583070"><strong>(01) 658 3070</strong></a>
+                    -
+                    <a href="https://jigsaw.ie/location/dublin-city/">jigsaw.ie/dublin-city</a><br>
+                    Dublin South West:
+                    <a href="tel:015380087"><strong>01 538 0087</strong></a>
+                    -
+                    <a href="https://jigsaw.ie/location/dublin-south-west/">jigsaw.ie/dublin-south-west</a>
+                </li>
+                <li>
+                    <strong>Dublin Rape Crisis Centre (in-person, Dublin 2):</strong>
+                    McGonnell House, 70 Lower Leeson Street, Dublin 2
+                    (24-hour helpline
+                    <a href="tel:1800778888"><strong>1800 77 8888</strong></a>)
+                    -
+                    <a href="https://www.drcc.ie/about/contact/">drcc.ie contact</a>
+                </li>
+            </ul>
         </div>
     </section>
 </main>
