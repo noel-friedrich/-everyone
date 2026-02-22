@@ -60,7 +60,7 @@ class TwilioService
       ) do |g|
         g.say(
           voice: "alice",
-          message: "Press 1 to connect with them. Or just hang up if you can't right now."
+          message: "Press 1 to accept this alert request. Or hang up if you can't right now."
         )
       end
       r.say(
@@ -80,13 +80,63 @@ class TwilioService
         call = client.calls.create(
           from: from_number,
           to: normalized,
-          twiml: contact_twiml
+          twiml: contact_twiml,
+          timeout: 15
         )
 
         results << { number: normalized, call_sid: call.sid, status: "calling" }
       rescue Twilio::REST::RestError => e
         Rails.logger.error("[TwilioService] Failed to call #{normalized}: #{e.message}")
         results << { number: normalized, call_sid: nil, status: "failed", error: e.message }
+      end
+    end
+
+    results
+  end
+
+  # -------------------------------------------------------------------
+  # Call a list of tracked CallSessionContact records.
+  # Each contact receives unique gather/status callback URLs so their
+  # status can be updated live in the database.
+  # -------------------------------------------------------------------
+  def call_everyone_with_tracking(session_contacts:, room_name:, caller_name:, base_url:)
+    results = []
+
+    session_contacts.each do |contact|
+      gather_action_url = "#{base_url}/api/calls/gather_response?contact_id=#{contact.id}"
+      status_callback_url = "#{base_url}/api/calls/status_callback?contact_id=#{contact.id}"
+      contact_twiml = contact_call_twiml(
+        caller_name: caller_name,
+        gather_action_url: gather_action_url
+      )
+
+      begin
+        call = client.calls.create(
+          from: from_number,
+          to: contact.phone_number,
+          twiml: contact_twiml,
+          timeout: 15,
+          status_callback: status_callback_url,
+          status_callback_method: "POST",
+          status_callback_event: %w[initiated ringing answered completed]
+        )
+
+        contact.update!(
+          call_sid: call.sid,
+          status: "calling",
+          last_event_at: Time.current,
+          error_message: nil
+        )
+
+        results << { number: contact.phone_number, call_sid: call.sid, status: "calling" }
+      rescue Twilio::REST::RestError => e
+        Rails.logger.error("[TwilioService] Failed to call #{contact.phone_number}: #{e.message}")
+        contact.update!(
+          status: "failed",
+          error_message: e.message,
+          last_event_at: Time.current
+        )
+        results << { number: contact.phone_number, call_sid: nil, status: "failed", error: e.message }
       end
     end
 
@@ -154,6 +204,32 @@ class TwilioService
   end
 
   private
+
+  def contact_call_twiml(caller_name:, gather_action_url:)
+    Twilio::TwiML::VoiceResponse.new do |r|
+      r.say(
+        voice: "alice",
+        message: "Hey. #{caller_name} triggered at everyone. They need to talk to someone right now."
+      )
+      r.gather(
+        num_digits: 1,
+        action: gather_action_url,
+        method: "POST",
+        timeout: 15,
+        action_on_empty_result: true
+      ) do |g|
+        g.say(
+          voice: "alice",
+          message: "Press 1 to accept this alert request. Or hang up if you can't right now."
+        )
+      end
+      r.say(
+        voice: "alice",
+        message: "We didn't get a response. Thanks for being available. Goodbye."
+      )
+      r.hangup
+    end.to_s
+  end
 
   def normalize_number(number)
     cleaned = number.to_s.strip.gsub(/[^\d+]/, "")

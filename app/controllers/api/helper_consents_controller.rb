@@ -1,6 +1,7 @@
 module Api
   class HelperConsentsController < ActionController::API
     MAX_HASHES_PER_REQUEST = 500
+    E164_REGEX = /\A\+[1-9]\d{1,14}\z/
 
     # POST /api/helper_consents/bulk_lookup
     # Params:
@@ -52,6 +53,55 @@ module Api
       render json: { error: e.record.errors.full_messages.join(", ") }, status: :unprocessable_entity
     end
 
+    # POST /api/helper_consents/send_opt_in
+    # Params:
+    #   hash   - SHA-256 hex digest for "#{CLIENT_UID}#{HELPER_NUMBER}"
+    #   number - helper phone number in E.164 format
+    #   name   - optional helper display name
+    def send_opt_in
+      consent_hash = normalize_hash(params.require(:hash))
+      number = normalize_number(params.require(:number))
+      name = params[:name].to_s.strip.presence || "there"
+
+      unless consent_hash
+        return render json: { error: "hash must be a SHA-256 hex digest" }, status: :unprocessable_entity
+      end
+
+      unless number
+        return render json: { error: "number must be E.164 format, e.g. +491701234567" },
+                      status: :unprocessable_entity
+      end
+
+      existing = HelperConsent.find_by(consent_hash: consent_hash)
+      if existing&.status == "declined"
+        return render json: { error: "This helper has declined and cannot be requested again." }, status: :conflict
+      end
+
+      consent = existing || HelperConsent.new(consent_hash: consent_hash)
+
+      consent_link = "#{request.base_url}/consent?hash=#{consent_hash}"
+      message = "Hi #{name}, confirm if you want to receive alerts: #{consent_link}"
+
+      result = ::TwilioService.new.send_sms(to: number, message: message)
+      consent.status = "pending"
+      consent.save!
+
+      render json: {
+        hash: consent_hash,
+        status: consent.status,
+        sms_sid: result.sid,
+        to: result.to
+      }, status: :ok
+    rescue KeyError => e
+      render json: { error: "Missing environment variable: #{e.key}" }, status: :internal_server_error
+    rescue ActionController::ParameterMissing => e
+      render json: { error: e.message }, status: :unprocessable_entity
+    rescue ActiveRecord::RecordInvalid => e
+      render json: { error: e.record.errors.full_messages.join(", ") }, status: :unprocessable_entity
+    rescue Twilio::REST::RestError => e
+      render json: { error: "Twilio error: #{e.message}" }, status: :unprocessable_entity
+    end
+
     private
 
     def normalized_hashes(raw_hashes)
@@ -66,6 +116,14 @@ module Api
     def normalize_hash(value)
       candidate = value.to_s.strip.downcase
       candidate.match?(/\A\h{64}\z/) ? candidate : nil
+    end
+
+    def normalize_number(value)
+      candidate = value.to_s.strip.gsub(/[^\d+]/, "")
+      return nil if candidate.blank?
+
+      candidate = "+#{candidate}" unless candidate.start_with?("+")
+      candidate.match?(E164_REGEX) ? candidate : nil
     end
   end
 end

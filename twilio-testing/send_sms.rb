@@ -1,12 +1,17 @@
 #!/usr/bin/env ruby
 # send_sms.rb
 require "twilio-ruby"
+begin
+  require "dotenv/load"
+rescue LoadError
+  # Fallback: variables must be provided by shell if dotenv is unavailable.
+end
 
 # Read credentials from environment variables (recommended)
 account_sid = ENV.fetch("TWILIO_ACCOUNT_SID")
 auth_token  = ENV.fetch("TWILIO_AUTH_TOKEN")
 
-from_number = "+12345952379" # e.g. +14155552671 (your Twilio number)
+from_number = ENV.fetch("TWILIO_FROM_NUMBER") # e.g. +14155552671 (your Twilio number)
 to_number   = ENV.fetch("TEST_NUMBER")   # e.g. +491701234567 (your phone)
 
 message_body = ARGV.join(" ")

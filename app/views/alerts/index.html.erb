@@ -1,0 +1,88 @@
+<% content_for :title, "alert" %>
+
+<canvas
+    id="flow-canvas"
+    class="flow-canvas"
+    data-controller="flow"
+    aria-hidden="true"
+></canvas>
+
+<a href="/" class="logo-container" aria-label="@everyone home">
+    <%= image_tag "logo-with-text.png", alt: "@everyone logo", class: "logo logo--studio" %>
+</a>
+
+<main class="studio-page alert-page">
+    <section class="studio-top">
+        <h1>Live Alert</h1>
+        <p>Trigger calls and watch who is being called, who hung up, and who accepted.</p>
+    </section>
+
+    <section class="studio-table-shell alert-shell" data-controller="alert">
+        <div class="alert-controls">
+            <button
+                type="button"
+                class="studio-alert-chip is-primary alert-trigger"
+                data-alert-target="alertButton"
+                data-action="click->alert#startAlert"
+            >
+                ALERT
+            </button>
+            <button
+                type="button"
+                class="studio-alert-chip alert-cancel"
+                data-alert-target="cancelButton"
+                data-action="click->alert#cancelAlert"
+                disabled
+            >
+                Cancel
+            </button>
+        </div>
+
+        <div class="alert-meta">
+            <div class="alert-stage" data-alert-target="stage">
+                <article class="alert-zone">
+                    <h3>
+                        Calling
+                        <span data-alert-target="callingCount">0</span>
+                    </h3>
+                    <div class="alert-zone-icons" data-alert-target="callingZone"></div>
+                </article>
+                <article class="alert-zone">
+                    <h3>
+                        Declined
+                        <span data-alert-target="declinedCount">0</span>
+                    </h3>
+                    <div class="alert-zone-icons" data-alert-target="declinedZone"></div>
+                </article>
+                <article class="alert-zone">
+                    <h3>
+                        No Response
+                        <span data-alert-target="noResponseCount">0</span>
+                    </h3>
+                    <div class="alert-zone-icons" data-alert-target="noResponseZone"></div>
+                </article>
+                <article class="alert-zone">
+                    <h3>
+                        Accepted
+                        <span data-alert-target="acceptedCount">0</span>
+                    </h3>
+                    <div class="alert-zone-icons" data-alert-target="acceptedZone"></div>
+                </article>
+                <div class="alert-icons-layer" data-alert-target="iconLayer" aria-hidden="true"></div>
+            </div>
+            <p class="alert-error" data-alert-target="error"></p>
+        </div>
+
+        <div class="studio-table-wrap">
+            <table class="studio-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Live status</th>
+                    </tr>
+                </thead>
+                <tbody data-alert-target="tbody"></tbody>
+            </table>
+        </div>
+    </section>
+</main>

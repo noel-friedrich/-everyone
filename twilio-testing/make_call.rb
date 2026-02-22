@@ -1,12 +1,18 @@
 #!/usr/bin/env ruby
 # test_call.rb
+begin
+  require "dotenv/load"
+rescue LoadError
+  # Fallback: variables must be provided by shell if dotenv is unavailable.
+end
+
 require "twilio-ruby"
 
 # Read credentials from environment variables (recommended)
 account_sid = ENV.fetch("TWILIO_ACCOUNT_SID")
 auth_token  = ENV.fetch("TWILIO_AUTH_TOKEN")
 
-from_number = "+12345952379"            # your Twilio voice-capable number
+from_number = ENV.fetch("TWILIO_FROM_NUMBER")
 to_number   = ENV.fetch("TEST_NUMBER")  # e.g. +491701234567
 
 client = Twilio::REST::Client.new(account_sid, auth_token)
@@ -16,7 +22,8 @@ client = Twilio::REST::Client.new(account_sid, auth_token)
 call = client.calls.create(
   from: from_number,
   to: to_number,
-  url: "http://demo.twilio.com/docs/voice.xml"
+  url: "http://demo.twilio.com/docs/voice.xml",
+  timeout: 10
 )
 
 puts "📞 Call initiated! SID: #{call.sid}"

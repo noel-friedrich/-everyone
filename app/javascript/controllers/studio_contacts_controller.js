@@ -72,6 +72,17 @@ export default class extends Controller {
     this.contacts = this.loadContacts();
     this.renderRows();
     this.syncStatusesFromServer();
+    this.syncTimer = window.setInterval(
+      () => this.syncStatusesFromServer(),
+      15000,
+    );
+  }
+
+  disconnect() {
+    if (this.syncTimer) {
+      window.clearInterval(this.syncTimer);
+      this.syncTimer = null;
+    }
   }
 
   startAdd() {
@@ -140,7 +151,11 @@ export default class extends Controller {
         const existing = await this.bulkLookup([consentHash]);
         const existingStatus = normalizeStatus(existing[consentHash]);
         if (existingStatus !== "declined") {
-          await this.upsertConsent(consentHash, "pending");
+          await this.sendOptInSms({
+            hash: consentHash,
+            number: draft.phone,
+            name: draft.name,
+          });
         }
       }
       await this.syncStatusesFromServer();
@@ -230,18 +245,18 @@ export default class extends Controller {
     return payload.consents || {};
   }
 
-  async upsertConsent(hash, status) {
-    const response = await fetch("/api/helper_consents", {
+  async sendOptInSms({ hash, number, name }) {
+    const response = await fetch("/api/helper_consents/send_opt_in", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({ hash, status }),
+      body: JSON.stringify({ hash, number, name }),
     });
 
     if (!response.ok) {
-      throw new Error(`upsert failed with status ${response.status}`);
+      throw new Error(`send_opt_in failed with status ${response.status}`);
     }
   }
 

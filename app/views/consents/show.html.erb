@@ -1,0 +1,25 @@
+<% content_for :title, "Confirm alert opt-in" %>
+
+<main class="consent-page">
+  <section class="consent-card">
+    <h1>Alert Opt-In</h1>
+
+    <% if @consent_hash.blank? %>
+      <p>This confirmation link is invalid.</p>
+    <% else %>
+      <p>Choose whether you want to receive alert calls and messages from this client.</p>
+
+      <p class="consent-current">
+        Current status:
+        <span class="studio-status <%= @status == 'confirmed' ? 'is-confirmed' : @status == 'declined' ? 'is-declined' : 'is-pending' %>">
+          <%= @status.capitalize %>
+        </span>
+      </p>
+
+      <div class="consent-actions">
+        <%= button_to "Accept", consent_respond_path(hash: @consent_hash, status: "confirmed"), method: :post, class: "consent-btn consent-btn--accept" %>
+        <%= button_to "Decline", consent_respond_path(hash: @consent_hash, status: "declined"), method: :post, class: "consent-btn consent-btn--decline" %>
+      </div>
+    <% end %>
+  </section>
+</main>
