@@ -324,9 +324,10 @@ module Api
       when "in-progress"
         current_status == "joined" ? "joined" : "picked_up"
       when "completed"
+        return "declined" if %w[calling ringing picked_up].include?(current_status)
         CallSessionContact::FINAL_STATUSES.include?(current_status) ? current_status : "completed"
       when "busy"
-        "busy"
+        "declined"
       when "failed"
         "failed"
       when "no-answer"

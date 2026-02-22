@@ -17,7 +17,11 @@
         <p>Trigger calls and watch who is being called, who hung up, and who accepted.</p>
     </section>
 
-    <section class="studio-table-shell alert-shell" data-controller="alert">
+    <section
+        class="studio-table-shell alert-shell"
+        data-controller="alert"
+        data-alert-db-contacts="<%= json_escape(@db_confirmed_contacts.to_json) %>"
+    >
         <div class="alert-intake" data-alert-target="intakeCard" hidden>
             <div class="alert-intake__head">
                 <p class="alert-intake__eyebrow">Before we call</p>
@@ -44,9 +48,10 @@
                 type="button"
                 class="studio-alert-chip is-primary alert-trigger"
                 data-alert-target="alertButton"
+                data-db-count="<%= @callable_contact_count %>"
                 data-action="click->alert#startAlert"
             >
-                CALL CONTACTS
+                Call <%= @callable_contact_count %> contact<%= "s" unless @callable_contact_count == 1 %>
             </button>
             <button
                 type="button"

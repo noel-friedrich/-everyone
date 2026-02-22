@@ -494,6 +494,10 @@ body {
     line-height: 1.2;
 }
 
+.alert-controls .studio-alert-chip[hidden] {
+    display: none !important;
+}
+
 .alert-trigger {
     min-width: 8rem;
     text-align: center;

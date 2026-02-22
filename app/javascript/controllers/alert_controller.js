@@ -108,6 +108,20 @@ function sanitizeLocalContact(raw) {
   };
 }
 
+function mergeAlertContactsByPhone(...contactLists) {
+  const merged = new Map();
+
+  contactLists.flat().forEach((rawContact) => {
+    const contact = sanitizeLocalContact(rawContact);
+    if (!contact.name || !contact.phone) return;
+
+    const existing = merged.get(contact.phone) || {};
+    merged.set(contact.phone, { ...existing, ...contact });
+  });
+
+  return Array.from(merged.values());
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -194,7 +208,8 @@ export default class extends Controller {
     this.clientUid = ensureClientUid();
     this.pageParams = new URLSearchParams(window.location.search);
     this.demoMode = new URLSearchParams(window.location.search).has("demo");
-    this.autoStartRequested = !this.demoMode;
+    this.dbContactCount = Number(this.alertButtonTarget.dataset.dbCount) || 0;
+    this.autoStartRequested = false;
     this.autoStartAttempted = false;
     this.promptSteps = ALERT_PROMPT_STEPS;
     this.promptStepIndex = 0;
@@ -222,7 +237,7 @@ export default class extends Controller {
         this.startDemoSequence();
       }, 500);
     } else {
-      this.loadConfirmedContacts().then(() => this.maybeAutoStart());
+      this.loadConfirmedContacts();
       this.syncTimer = window.setInterval(
         () => this.loadConfirmedContacts(),
         15000,
@@ -273,10 +288,22 @@ export default class extends Controller {
       return;
     }
 
-    const previousByPhone = new Map(this.contacts.map((c) => [c.phone, c]));
+    if (this.hasLiveCallInProgress()) return;
+
+    const dbContacts = this.loadDbContacts();
     const localContacts = this.loadLocalContacts();
     if (localContacts.length === 0) {
-      this.contacts = [];
+      const previousByPhone = new Map(this.contacts.map((c) => [c.phone, c]));
+      this.contacts = dbContacts.map((contact) => {
+        const previous = previousByPhone.get(contact.phone);
+        return {
+          name: contact.name,
+          phone: contact.phone,
+          callStatus: previous?.callStatus || "ready",
+          callSid: previous?.callSid || null,
+          lastEventAt: previous?.lastEventAt || null,
+        };
+      });
       this.render();
       return;
     }
@@ -287,10 +314,15 @@ export default class extends Controller {
       );
       const statusesByHash = await this.bulkLookup(hashes);
 
-      this.contacts = localContacts
+      const confirmedLocalContacts = localContacts
         .filter(
           (contact, index) => statusesByHash[hashes[index]] === "confirmed",
-        )
+        );
+      const combinedContacts = mergeAlertContactsByPhone(confirmedLocalContacts, dbContacts);
+      if (this.hasLiveCallInProgress()) return;
+      const previousByPhone = new Map(this.contacts.map((c) => [c.phone, c]));
+
+      this.contacts = combinedContacts
         .map((contact) => {
           const previous = previousByPhone.get(contact.phone);
           return {
@@ -307,6 +339,26 @@ export default class extends Controller {
     }
 
     this.render();
+  }
+
+  hasLiveCallInProgress() {
+    if (this.demoMode) return this.demoRunning;
+    if (this.stream || this.sessionStatus === "calling") return true;
+    return this.contacts.some((contact) =>
+      ACTIVE_CALL_STATUSES.has(contact.callStatus),
+    );
+  }
+
+  loadDbContacts() {
+    try {
+      const raw = this.element.dataset.alertDbContacts || "[]";
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed)
+        ? parsed.map(sanitizeLocalContact).filter((contact) => contact.name && contact.phone)
+        : [];
+    } catch (_) {
+      return [];
+    }
   }
 
   resetDemoContacts() {
@@ -361,6 +413,9 @@ export default class extends Controller {
 
   async startAlert() {
     if (!this.demoMode && !this.promptCompleted) {
+      this.autoStartRequested = true;
+      this.autoStartAttempted = false;
+      this.alertButtonTarget.hidden = true;
       this.showPrompt();
       return;
     }
@@ -442,6 +497,7 @@ export default class extends Controller {
       if (requestId !== this.startRequestId) return;
       this.setError("Could not start alert calls.");
       this.alertButtonTarget.disabled = false;
+      this.alertButtonTarget.hidden = false;
       console.error(error);
     }
 
@@ -491,6 +547,13 @@ export default class extends Controller {
     this.sessionId = null;
     this.sessionStatus = "idle";
     this.alertButtonTarget.disabled = false;
+    this.alertButtonTarget.hidden = false;
+    this.autoStartRequested = false;
+    this.autoStartAttempted = false;
+    this.promptCompleted = false;
+    this.promptStepIndex = 0;
+    this.intakeAnswers = this.initialIntakeAnswers();
+    this.hidePrompt();
     this.closeStream();
     this.render();
   }
@@ -691,6 +754,9 @@ export default class extends Controller {
         this.sessionStatus = payload.status || this.sessionStatus;
         if (this.sessionStatus === "completed") {
           this.alertButtonTarget.disabled = false;
+          this.alertButtonTarget.hidden = false;
+          this.autoStartRequested = false;
+          this.autoStartAttempted = false;
           this.cancelButtonTarget.disabled = true;
           this.closeStream();
         }
@@ -808,6 +874,7 @@ export default class extends Controller {
 
   showPrompt() {
     if (this.promptCompleted || !this.hasIntakeCardTarget) return;
+    if (this.hasAlertButtonTarget) this.alertButtonTarget.hidden = true;
     this.intakeCardTarget.hidden = false;
     this.renderIntakePrompt();
   }
@@ -1061,8 +1128,12 @@ export default class extends Controller {
   }
 
   updateAlertButtonLabel(total) {
-    const suffix = total === 1 ? "" : "S";
-    this.alertButtonTarget.textContent = `CALL ${total} CONTACT${suffix}`;
+    const displayCount =
+      this.sessionId || this.sessionStatus === "calling"
+        ? total
+        : this.dbContactCount;
+    const suffix = displayCount === 1 ? "" : "S";
+    this.alertButtonTarget.textContent = `CALL ${displayCount} CONTACT${suffix}`;
   }
 
   render() {
@@ -1071,6 +1142,10 @@ export default class extends Controller {
       ACTIVE_CALL_STATUSES.has(c.callStatus),
     );
     this.updateAlertButtonLabel(total);
+
+    if (!this.demoMode && !this.promptCompleted && !this.intakeCardTarget.hidden) {
+      this.alertButtonTarget.hidden = true;
+    }
 
     if (total === 0) {
       this.alertButtonTarget.disabled = this.demoMode;
@@ -1081,7 +1156,7 @@ export default class extends Controller {
         </tr>
       `;
       this.renderStage();
-      if (!this.promptCompleted) this.showPrompt();
+      if (this.autoStartRequested && !this.promptCompleted) this.showPrompt();
       return;
     }
 
@@ -1097,6 +1172,6 @@ export default class extends Controller {
 
     this.renderStage();
     this.renderTableRows();
-    if (!this.promptCompleted) this.showPrompt();
+    if (this.autoStartRequested && !this.promptCompleted) this.showPrompt();
   }
 }

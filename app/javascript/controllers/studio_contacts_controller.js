@@ -35,6 +35,20 @@ function isUsableContact(contact) {
   return Boolean(contact?.name) && Boolean(contact?.phone);
 }
 
+function mergeContactsByPhone(...contactLists) {
+  const merged = new Map();
+
+  contactLists.flat().forEach((rawContact) => {
+    const contact = sanitizeContact(rawContact);
+    if (!isUsableContact(contact)) return;
+
+    const existing = merged.get(contact.phone) || {};
+    merged.set(contact.phone, { ...existing, ...contact });
+  });
+
+  return Array.from(merged.values());
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -172,23 +186,22 @@ export default class extends Controller {
   loadContacts() {
     const storageKey = this.storageKeyValue || "studio_contacts_v1";
     const raw = localStorage.getItem(storageKey);
+    const initialContacts = Array.isArray(this.initialValue) ? this.initialValue : [];
 
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          const sanitized = parsed.map(sanitizeContact).filter(isUsableContact);
-          localStorage.setItem(storageKey, JSON.stringify(sanitized));
-          return sanitized;
+          const merged = mergeContactsByPhone(parsed, initialContacts);
+          localStorage.setItem(storageKey, JSON.stringify(merged));
+          return merged;
         }
       } catch (_) {
         // If malformed, fall back to initial sample data below.
       }
     }
 
-    const fallback = (this.initialValue || [])
-      .map(sanitizeContact)
-      .filter(isUsableContact);
+    const fallback = mergeContactsByPhone(initialContacts);
     localStorage.setItem(storageKey, JSON.stringify(fallback));
     return fallback;
   }
@@ -215,7 +228,11 @@ export default class extends Controller {
 
       let changed = false;
       this.contacts = this.contacts.map((contact, index) => {
-        const status = normalizeStatus(knownStatuses[consentHashes[index]]);
+        const lookupStatus = knownStatuses[consentHashes[index]];
+        const status =
+          lookupStatus === undefined
+            ? contact.status
+            : normalizeStatus(lookupStatus);
         if (contact.status !== status) changed = true;
         return { ...contact, status };
       });
