@@ -29,10 +29,67 @@
         </div>
     </section>
 
-    <section class="studio-table-shell">
+    <section
+        class="studio-table-shell"
+        data-controller="studio-contacts"
+        data-studio-contacts-initial-value="<%= json_escape(@contacts.to_json) %>"
+        data-studio-contacts-storage-key-value="studio_contacts_v1"
+    >
         <div class="studio-table-head">
             <h2>Your contacts</h2>
-            <button type="button" class="studio-add">Add another contact</button>
+            <button
+                type="button"
+                class="studio-add"
+                data-action="click->studio-contacts#startAdd"
+            >
+                Add another contact
+            </button>
+        </div>
+
+        <div class="studio-status-help">
+            <p><strong>Status guide:</strong></p>
+            <p>
+                Confirmed: this person opted in to being alerted when you press
+                ALERT.
+            </p>
+            <p>Pending: this person has not replied to the opt-in SMS yet.</p>
+            <p>
+                Declined: this person said no. You cannot send another request.
+            </p>
+        </div>
+
+        <div class="studio-editor" data-studio-contacts-target="editor" hidden>
+            <h3 data-studio-contacts-target="editorTitle">Add contact</h3>
+            <form class="studio-editor-form" data-action="submit->studio-contacts#save">
+                <label for="studio-name">Name</label>
+                <input
+                    id="studio-name"
+                    data-studio-contacts-target="nameInput"
+                    type="text"
+                    required
+>
+
+                <label for="studio-phone">Phone</label>
+                <input
+                    id="studio-phone"
+                    data-studio-contacts-target="phoneInput"
+                    type="text"
+                    required
+>
+
+                <div class="studio-editor-actions">
+                    <button type="submit" class="studio-action-btn">
+                        Save contact &amp; send opt-in SMS
+                    </button>
+                    <button
+                        type="button"
+                        class="studio-action-btn"
+                        data-action="click->studio-contacts#cancel"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </form>
         </div>
 
         <div class="studio-table-wrap">
@@ -45,34 +102,7 @@
                         <th>Actions</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <% @contacts.each do |contact| %>
-                    <tr>
-                        <td><%= contact[:name] %></td>
-                        <td><%= contact[:phone] %></td>
-                        <td>
-                            <span
-                                class="studio-status <%= contact[:confirmed] ? 'is-confirmed' : 'is-pending' %>"
-                            >
-                                <%= contact[:confirmed] ? "Confirmed" : "Pending" %>
-                            </span>
-                        </td>
-                        <td>
-                            <div class="studio-actions">
-                                <button type="button" class="studio-action-btn">
-                                    Edit
-                                </button>
-                                <button
-                                    type="button"
-                                    class="studio-action-btn is-danger"
-                                >
-                                    Remove
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    <% end %>
-                </tbody>
+                <tbody data-studio-contacts-target="tbody"></tbody>
             </table>
         </div>
     </section>

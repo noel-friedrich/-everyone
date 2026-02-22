@@ -33,4 +33,8 @@
 # Ignore key files for decrypting credentials and more.
 /config/*.key
 
-/db
+/db/*
+!/db/seeds.rb
+!/db/*_schema.rb
+!/db/migrate/
+!/db/migrate/*.rb

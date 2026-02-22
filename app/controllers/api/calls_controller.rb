@@ -12,7 +12,7 @@ module Api
     def token
       identity = params[:identity] || "user-#{SecureRandom.hex(4)}"
 
-      service = TwilioService.new
+      service = ::TwilioService.new
       jwt = service.generate_access_token(identity: identity)
 
       render json: { token: jwt, identity: identity }, status: :ok
@@ -44,7 +44,7 @@ module Api
         return render json: { error: "numbers must be a non-empty array" }, status: :unprocessable_entity
       end
 
-      service = TwilioService.new
+      service = ::TwilioService.new
       results = service.call_everyone(
         numbers: numbers,
         room_name: room_name,
@@ -75,7 +75,7 @@ module Api
         return render json: { error: "call_sids must be a non-empty array" }, status: :unprocessable_entity
       end
 
-      service = TwilioService.new
+      service = ::TwilioService.new
       results = service.hangup_calls(call_sids: call_sids)
 
       render json: { results: results }, status: :ok
@@ -99,7 +99,7 @@ module Api
       number  = params.require(:number)
       message = params.require(:message)
 
-      service = TwilioService.new
+      service = ::TwilioService.new
       result  = service.send_sms(to: number, message: message)
 
       render json: { sid: result.sid, status: result.status, to: result.to }, status: :ok
@@ -129,7 +129,7 @@ module Api
         return render json: { error: "numbers must be a non-empty array" }, status: :unprocessable_entity
       end
 
-      service = TwilioService.new
+      service = ::TwilioService.new
       results = service.send_sms_all(numbers: numbers, message: message)
 
       render json: { results: results }, status: :ok

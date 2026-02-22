@@ -23,5 +23,8 @@ module Hackeurope26
     #
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
+    services_path = Rails.root.join("app/services")
+    config.autoload_paths << services_path
+    config.eager_load_paths << services_path
   end
 end
