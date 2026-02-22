@@ -1,7 +1,11 @@
 import { Controller } from "@hotwired/stimulus";
 
 const SNAKE_COUNT = 16;
-const SUBSTEPS = 5;
+const MOBILE_SNAKE_REDUCTION = 2;
+const MOBILE_BREAKPOINT = 800;
+const TARGET_UPDATES_PER_SECOND = 30;
+const STEP_MS = 1000 / TARGET_UPDATES_PER_SECOND;
+const MAX_CATCHUP_STEPS = 4;
 
 function wrapAngle(angle) {
   while (angle > Math.PI) angle -= Math.PI * 2;
@@ -23,6 +27,10 @@ export default class extends Controller {
     this.height = 0;
     this.snakes = [];
     this.rafId = null;
+    this.lastFrameAt = null;
+    this.accumulatorMs = 0;
+    this.simTimeMs = 0;
+    this.speedMultiplier = 1;
 
     const pageBg = getComputedStyle(document.body).backgroundColor;
     const bgMatch = pageBg.match(/\d+/g);
@@ -95,6 +103,12 @@ export default class extends Controller {
 
   resize() {
     const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const isMobile = window.innerWidth < MOBILE_BREAKPOINT;
+    const snakeCount = Math.max(
+      1,
+      SNAKE_COUNT - (isMobile ? MOBILE_SNAKE_REDUCTION : 0),
+    );
+    this.speedMultiplier = isMobile ? 0.6 : 1;
     this.width = Math.floor(window.innerWidth);
     this.height = Math.floor(window.innerHeight);
     this.canvas.width = Math.floor(this.width * dpr);
@@ -107,7 +121,7 @@ export default class extends Controller {
     this.ctx.fillStyle = `rgba(${this.bgRgb}, 1)`;
     this.ctx.fillRect(0, 0, this.width, this.height);
 
-    this.snakes = Array.from({ length: SNAKE_COUNT }, (_, i) =>
+    this.snakes = Array.from({ length: snakeCount }, (_, i) =>
       this.makeSnake(i),
     );
   }
@@ -156,7 +170,8 @@ export default class extends Controller {
     snake.heading += turn;
 
     const speedBoost = Math.min(1.8, Math.abs(turn) * 24);
-    const speed = (snake.baseSpeed + speedBoost) * stepScale;
+    const speed =
+      (snake.baseSpeed + speedBoost) * stepScale * this.speedMultiplier;
 
     let nextX = snake.x + Math.cos(snake.heading) * speed;
     let nextY = snake.y + Math.sin(snake.heading) * speed;
@@ -208,20 +223,42 @@ export default class extends Controller {
     this.ctx.globalAlpha = 1;
   }
 
-  tick(t) {
+  stepSimulation(stepMs) {
+    const stepScale = stepMs / STEP_MS;
+
     this.ctx.save();
     this.ctx.globalCompositeOperation = "destination-out";
-    this.ctx.fillStyle = `rgba(0, 0, 0, ${this.fadeStrength})`;
+    this.ctx.fillStyle = `rgba(0, 0, 0, ${this.fadeStrength * stepScale})`;
     this.ctx.fillRect(0, 0, this.width, this.height);
     this.ctx.restore();
 
-    for (let step = 0; step < SUBSTEPS; step += 1) {
-      const stepTime = t + step * 2;
-      const stepScale = 1 / SUBSTEPS;
-      this.snakes.forEach((snake) =>
-        this.updateSnake(snake, stepTime, stepScale),
-      );
+    this.simTimeMs += stepMs;
+    this.snakes.forEach((snake) =>
+      this.updateSnake(snake, this.simTimeMs, stepScale),
+    );
+  }
+
+  tick(t) {
+    if (this.lastFrameAt == null) {
+      this.lastFrameAt = t;
+      this.rafId = window.requestAnimationFrame(this.tick);
+      return;
     }
+
+    const elapsedMs = Math.min(t - this.lastFrameAt, STEP_MS * 8);
+    this.lastFrameAt = t;
+    this.accumulatorMs += elapsedMs;
+
+    let steps = 0;
+    while (this.accumulatorMs >= STEP_MS && steps < MAX_CATCHUP_STEPS) {
+      this.stepSimulation(STEP_MS);
+      this.accumulatorMs -= STEP_MS;
+      steps += 1;
+    }
+    if (steps === MAX_CATCHUP_STEPS && this.accumulatorMs >= STEP_MS) {
+      this.accumulatorMs = 0;
+    }
+
     this.rafId = window.requestAnimationFrame(this.tick);
   }
 }
