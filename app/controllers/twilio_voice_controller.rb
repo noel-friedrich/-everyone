@@ -99,13 +99,27 @@ class TwilioVoiceController < ApplicationController
   end
 
   def validate_twilio_request!
+    if Rails.env.development? && ENV.fetch("TWILIO_SKIP_SIGNATURE_VALIDATION", "true") == "true"
+      Rails.logger.warn("twilio_signature_validation_skipped_in_development")
+      return
+    end
+
     signature = request.headers["X-Twilio-Signature"].to_s
     token = ENV["TWILIO_AUTH_TOKEN"].to_s
     return head :unauthorized if signature.blank? || token.blank?
 
     validator = Twilio::Security::RequestValidator.new(token)
     params_hash = request.request_parameters.to_h
-    valid = validator.validate(request.original_url, params_hash, signature)
-    head :unauthorized unless valid
+    candidate_urls = [
+      request.original_url.to_s,
+      request.original_url.to_s.sub(/\Ahttp:/, "https:"),
+      request.original_url.to_s.sub(/\Ahttps:/, "http:")
+    ].uniq
+
+    valid = candidate_urls.any? { |url| validator.validate(url, params_hash, signature) }
+    unless valid
+      Rails.logger.warn("twilio_signature_validation_failed url=#{request.original_url} params=#{params_hash.keys.sort.join(',')}")
+      head :unauthorized
+    end
   end
 end

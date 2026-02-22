@@ -1,5 +1,10 @@
+require "json"
+require "net/http"
+require "uri"
+
 class HomeController < ApplicationController
   FALLBACK_MESSAGE = "KC needs someone to talk right now.".freeze
+  DEV_PUBLIC_BASE_URL = "https://britany-schizogenetic-luz.ngrok-free.dev".freeze
   skip_forgery_protection only: :initiate_call
   def index; end
 
@@ -30,9 +35,27 @@ class HomeController < ApplicationController
       expires_in: 30.days
     )
 
-    webhook_base_url = ENV["PUBLIC_BASE_URL"].presence || request.base_url
+    webhook_base_url = resolved_public_base_url
     intro_url = build_webhook_url(webhook_base_url, twilio_voice_intro_path(activation_id: activation_id))
     status_url = build_webhook_url(webhook_base_url, twilio_voice_status_path(activation_id: activation_id))
+
+    if local_base_url?(webhook_base_url)
+      return respond_to do |format|
+        format.html { redirect_to root_path, alert: "PUBLIC_BASE_URL is not set to a public URL. Start ngrok and set PUBLIC_BASE_URL." }
+        format.json do
+          render json: {
+            status: "error",
+            error: "invalid_public_base_url",
+            message: "Twilio needs a public webhook URL. Set PUBLIC_BASE_URL to your ngrok https URL.",
+            debug: {
+              webhook_base_url: webhook_base_url,
+              intro_url: intro_url,
+              status_url: status_url
+            }
+          }, status: :unprocessable_entity
+        end
+      end
+    end
     Rails.logger.info("twilio_webhook_urls base=#{webhook_base_url} intro=#{intro_url} status=#{status_url}")
 
     client = Twilio::REST::Client.new(
@@ -69,7 +92,18 @@ class HomeController < ApplicationController
   rescue Twilio::REST::RestError => e
     respond_to do |format|
       format.html { redirect_to root_path, alert: "Twilio error: #{e.message}" }
-      format.json { render json: { status: "error", error: "twilio_error", message: e.message }, status: :bad_gateway }
+      format.json do
+        render json: {
+          status: "error",
+          error: "twilio_error",
+          message: e.message,
+          debug: {
+            webhook_base_url: webhook_base_url,
+            intro_url: intro_url,
+            status_url: status_url
+          }
+        }, status: :bad_gateway
+      end
     end
   end
 
@@ -81,5 +115,36 @@ class HomeController < ApplicationController
 
   def build_webhook_url(base_url, path)
     "#{base_url.to_s.chomp('/')}#{path}"
+  end
+
+  def resolved_public_base_url
+    ENV["PUBLIC_BASE_URL"].presence || ngrok_public_url.presence || development_public_base_url || request.base_url
+  end
+
+  def ngrok_public_url
+    uri = URI.parse("http://127.0.0.1:4040/api/tunnels")
+    response = Net::HTTP.get_response(uri)
+    return nil unless response.is_a?(Net::HTTPSuccess)
+
+    data = JSON.parse(response.body)
+    tunnels = Array(data["tunnels"])
+    https_tunnel = tunnels.find { |t| t["public_url"].to_s.start_with?("https://") }
+    https_tunnel&.dig("public_url")
+  rescue StandardError => e
+    Rails.logger.warn("ngrok_url_lookup_failed #{e.class}: #{e.message}")
+    nil
+  end
+
+  def local_base_url?(url)
+    host = URI.parse(url).host
+    host.blank? || [ "localhost", "127.0.0.1", "::1" ].include?(host)
+  rescue URI::InvalidURIError
+    true
+  end
+
+  def development_public_base_url
+    return nil unless Rails.env.development?
+
+    DEV_PUBLIC_BASE_URL
   end
 end
