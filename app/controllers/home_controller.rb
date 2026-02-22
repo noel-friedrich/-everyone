@@ -50,6 +50,20 @@ class HomeController < ApplicationController
     end
 
     room_name = "activation_#{activation_id}"
+    if local_base_url?(public_base_url)
+      return respond_to do |format|
+        format.html { redirect_to root_path, alert: "PUBLIC_BASE_URL must be a public https URL for Twilio callbacks." }
+        format.json do
+          render json: {
+            status: "error",
+            error: "invalid_public_base_url",
+            message: "Twilio cannot reach localhost callbacks. Set PUBLIC_BASE_URL to your ngrok/public URL.",
+            public_base_url: public_base_url
+          }, status: :unprocessable_entity
+        end
+      end
+    end
+
     session = CallSession.create!(
       room_name: room_name,
       caller_name: user.name.presence || "Someone",
@@ -63,7 +77,8 @@ class HomeController < ApplicationController
       room_name: room_name,
       caller_name: user.name.presence || "Someone",
       escalation_level: escalation_level,
-      base_url: public_base_url
+      base_url: public_base_url,
+      summary_text: summary_text
     )
     session.refresh_status!
     call_sids = session.call_session_contacts.where.not(call_sid: nil).pluck(:call_sid)
@@ -190,7 +205,8 @@ class HomeController < ApplicationController
     room_name:,
     caller_name:,
     escalation_level:,
-    base_url:
+    base_url:,
+    summary_text:
   )
     service = TwilioService.new
     ordered_groups = ESCALATION_PRIORITY_ORDER.fetch(escalation_level)
@@ -205,7 +221,8 @@ class HomeController < ApplicationController
         session_contacts: tracked_contacts,
         room_name: room_name,
         caller_name: caller_name,
-        base_url: base_url
+        base_url: base_url,
+        summary_message: summary_text
       )
 
       {
@@ -239,6 +256,13 @@ class HomeController < ApplicationController
 
   def public_base_url
     ENV["PUBLIC_BASE_URL"].to_s.strip.presence || request.base_url
+  end
+
+  def local_base_url?(url)
+    host = URI.parse(url).host
+    host.blank? || [ "localhost", "127.0.0.1", "::1" ].include?(host)
+  rescue URI::InvalidURIError
+    true
   end
 
   def contact_payload(contact)

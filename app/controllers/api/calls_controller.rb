@@ -210,10 +210,11 @@ module Api
       updates[:call_sid] = call_sid if call_sid.present? && contact.call_sid.blank?
       contact.update!(updates)
       contact.call_session.refresh_status!
+      summary_message = summary_message_for_contact(contact)
 
       twiml =
         if digits == "1"
-          accepted_twiml
+          accepted_twiml(summary_message:)
         else
           decline_twiml
         end
@@ -337,16 +338,27 @@ module Api
       end
     end
 
-    def accepted_twiml
+    def accepted_twiml(summary_message: nil)
+      spoken_summary = normalized_summary_message(summary_message)
+
       Twilio::TwiML::VoiceResponse.new do |r|
-        r.say(voice: "alice", message: "Thanks. You are marked as accepted. Goodbye.")
-        r.hangup
+        r.say(voice: "alice", message: "Thanks. You are marked as accepted.")
+        if spoken_summary.present?
+          r.pause(length: 5)
+          r.say(voice: "alice", message: spoken_summary)
+          r.say(voice: "alice", message: "Please stay on the line.")
+          r.pause(length: 600)
+        else
+          r.say(voice: "alice", message: "Goodbye.")
+          r.hangup
+        end
       end.to_s
     end
 
     def decline_twiml
       Twilio::TwiML::VoiceResponse.new do |r|
-        r.say(voice: "alice", message: "Thanks for letting us know. Goodbye.")
+        r.say(voice: "alice", message: "Thanks for letting us know.")
+        r.say(voice: "alice", message: "Goodbye.")
         r.hangup
       end.to_s
     end
@@ -384,6 +396,23 @@ module Api
 
     def sse_event(name, payload)
       +"event: #{name}\ndata: #{payload.to_json}\n\n"
+    end
+
+    def summary_message_for_contact(contact)
+      room_name = contact.call_session&.room_name.to_s
+      activation_id = room_name.delete_prefix("activation_")
+      return nil if activation_id.blank? || activation_id == room_name
+
+      Rails.cache.read("activation:#{activation_id}")&.dig("summary_text")
+    rescue StandardError
+      nil
+    end
+
+    def normalized_summary_message(message)
+      text = message.to_s.strip
+      return nil if text.blank?
+
+      text.tr("\n", " ")[0, 500]
     end
   end
 end

@@ -43,32 +43,15 @@ class TwilioService
   # Returns an array of results per number:
   #   [{ number: "+1...", call_sid: "CA...", status: "calling" }, ...]
   # -------------------------------------------------------------------
-  def call_everyone(numbers:, room_name:, caller_name: "Someone")
+  def call_everyone(numbers:, room_name:, caller_name: "Someone", summary_message: nil)
     twiml_bin_url = ENV.fetch("TWILIO_TWIML_BIN_URL")
     gather_action_url = "#{twiml_bin_url}?RoomName=#{CGI.escape(room_name)}"
 
-    contact_twiml = Twilio::TwiML::VoiceResponse.new do |r|
-      r.say(
-        voice: "alice",
-        message: "Hey. #{caller_name} triggered at everyone. They need to talk to someone right now."
-      )
-      r.gather(
-        num_digits: 1,
-        action: gather_action_url,
-        method: "POST",
-        timeout: 15
-      ) do |g|
-        g.say(
-          voice: "alice",
-          message: "Press 1 to accept this alert request. Or hang up if you can't right now."
-        )
-      end
-      r.say(
-        voice: "alice",
-        message: "We didn't get a response. Thanks for being available. Goodbye."
-      )
-      r.hangup
-    end.to_s
+    contact_twiml = contact_call_twiml(
+      caller_name: caller_name,
+      gather_action_url: gather_action_url,
+      summary_message: summary_message
+    )
 
     results = []
 
@@ -99,7 +82,7 @@ class TwilioService
   # Each contact receives unique gather/status callback URLs so their
   # status can be updated live in the database.
   # -------------------------------------------------------------------
-  def call_everyone_with_tracking(session_contacts:, room_name:, caller_name:, base_url:)
+  def call_everyone_with_tracking(session_contacts:, room_name:, caller_name:, base_url:, summary_message: nil)
     results = []
 
     session_contacts.each do |contact|
@@ -107,7 +90,8 @@ class TwilioService
       status_callback_url = "#{base_url}/api/calls/status_callback?contact_id=#{contact.id}"
       contact_twiml = contact_call_twiml(
         caller_name: caller_name,
-        gather_action_url: gather_action_url
+        gather_action_url: gather_action_url,
+        summary_message: summary_message
       )
 
       begin
@@ -205,7 +189,9 @@ class TwilioService
 
   private
 
-  def contact_call_twiml(caller_name:, gather_action_url:)
+  def contact_call_twiml(caller_name:, gather_action_url:, summary_message: nil)
+    spoken_summary = normalized_summary_message(summary_message)
+
     Twilio::TwiML::VoiceResponse.new do |r|
       r.say(
         voice: "alice",
@@ -215,19 +201,31 @@ class TwilioService
         num_digits: 1,
         action: gather_action_url,
         method: "POST",
-        timeout: 15,
-        action_on_empty_result: true
+        timeout: 15
       ) do |g|
         g.say(
           voice: "alice",
           message: "Press 1 to accept this alert request. Or hang up if you can't right now."
         )
       end
+      r.pause(length: 5) if spoken_summary.present?
       r.say(
         voice: "alice",
-        message: "We didn't get a response. Thanks for being available. Goodbye."
-      )
-      r.hangup
+        message: spoken_summary
+      ) if spoken_summary.present?
+      if spoken_summary.present?
+        r.say(
+          voice: "alice",
+          message: "Please stay on the line."
+        )
+        r.pause(length: 600)
+      else
+        r.say(
+          voice: "alice",
+          message: "We didn't get a response. Thanks for being available. Goodbye."
+        )
+        r.hangup
+      end
     end.to_s
   end
 
@@ -236,5 +234,12 @@ class TwilioService
     cleaned.start_with?("+") ? cleaned : "+#{cleaned}"
   rescue
     nil
+  end
+
+  def normalized_summary_message(message)
+    text = message.to_s.strip
+    return nil if text.blank?
+
+    text.tr("\n", " ")[0, 500]
   end
 end
