@@ -12,4 +12,8 @@ Rails.application.routes.draw do
   # Defines the root path route ("/")
   root "home#index"
   post "initiate_call" => "home#initiate_call", as: :initiate_call
+
+  post "twilio/voice/intro" => "twilio_voice#intro", as: :twilio_voice_intro
+  post "twilio/voice/accept" => "twilio_voice#accept", as: :twilio_voice_accept
+  post "twilio/voice/status" => "twilio_voice#status", as: :twilio_voice_status
 end
