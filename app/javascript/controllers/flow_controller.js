@@ -44,21 +44,26 @@ export default class extends Controller {
 
     this.resize = this.resize.bind(this);
     this.tick = this.tick.bind(this);
+    this.handleGlobalClick = this.handleGlobalClick.bind(this);
 
     this.resize();
     window.addEventListener("resize", this.resize);
+    document.addEventListener("click", this.handleGlobalClick);
     this.rafId = window.requestAnimationFrame(this.tick);
   }
 
   disconnect() {
     window.removeEventListener("resize", this.resize);
+    document.removeEventListener("click", this.handleGlobalClick);
     if (this.rafId) window.cancelAnimationFrame(this.rafId);
     this.rafId = null;
   }
 
-  makeSnake(i) {
-    const x = randomBetween(0, this.width);
-    const y = randomBetween(0, this.height);
+  makeSnake(
+    i,
+    x = randomBetween(0, this.width),
+    y = randomBetween(0, this.height),
+  ) {
     return {
       x,
       y,
@@ -80,6 +85,14 @@ export default class extends Controller {
     };
   }
 
+  handleGlobalClick(event) {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    if (x < 0 || y < 0 || x > rect.width || y > rect.height) return;
+    this.snakes.push(this.makeSnake(this.snakes.length, x, y));
+  }
+
   resize() {
     const dpr = Math.max(1, window.devicePixelRatio || 1);
     this.width = Math.floor(window.innerWidth);
@@ -95,7 +108,7 @@ export default class extends Controller {
     this.ctx.fillRect(0, 0, this.width, this.height);
 
     this.snakes = Array.from({ length: SNAKE_COUNT }, (_, i) =>
-      this.makeSnake(i)
+      this.makeSnake(i),
     );
   }
 
@@ -205,7 +218,9 @@ export default class extends Controller {
     for (let step = 0; step < SUBSTEPS; step += 1) {
       const stepTime = t + step * 2;
       const stepScale = 1 / SUBSTEPS;
-      this.snakes.forEach((snake) => this.updateSnake(snake, stepTime, stepScale));
+      this.snakes.forEach((snake) =>
+        this.updateSnake(snake, stepTime, stepScale),
+      );
     }
     this.rafId = window.requestAnimationFrame(this.tick);
   }

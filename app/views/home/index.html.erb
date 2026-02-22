@@ -1,4 +1,4 @@
-<% content_for :title, "@everyone" %>
+<% content_for :title, "everyone" %>
 
 <canvas
     id="flow-canvas"
@@ -11,15 +11,82 @@
     <%= image_tag "logo-with-text.png", alt: "@everyone logo", class: "logo" %>
 </a>
 
-<main class="landing">
+<main class="landing" data-controller="circle-form">
     <section class="landing__content">
         <h1>Reach your trusted people faster.</h1>
         <p>
-            Setup a one-click call button for your inner circle. Everyone
-            receives a simultaneous call, the first person to answer will
-            connect to you as fast as possible. No app necessary for them. Made
-            for the moment you need it.
+            Set up a one-tap call button for your inner circle. Everyone gets
+            called at the same time, and the first person to answer is connected
+            to you instantly. No app needed for them. Built for the moments you
+            need it most.
         </p>
-        <button type="button" class="landing__cta">Set up your circle</button>
+        <button
+            type="button"
+            class="landing__cta"
+            data-action="click->circle-form#toggle"
+            data-circle-form-target="button"
+            aria-expanded="false"
+            aria-controls="circle-setup-panel"
+        >
+            Set up your circle
+        </button>
     </section>
+
+    <div
+        id="circle-setup-panel"
+        class="circle-form-panel"
+        data-circle-form-target="panel"
+        aria-hidden="true"
+    >
+        <div class="circle-form-panel__inner">
+            <div class="circle-form-panel__pad">
+                <div class="circle-form-card">
+                    <h2>
+                        Circle setup (I will delete this in a bit, just wanted
+                        to see how it looks)
+                    </h2>
+                    <form class="circle-form" action="#" method="post">
+                        <label for="your-name">Your name</label>
+                        <input id="your-name" name="your_name" type="text" />
+
+                        <label for="your-phone">Your phone</label>
+                        <input
+                            id="your-phone"
+                            name="your_phone"
+                            type="tel"
+                            placeholder="+49 ..."
+                        />
+
+                        <label for="contact-1">Trusted contact 1</label>
+                        <input
+                            id="contact-1"
+                            name="contact_1"
+                            type="tel"
+                            placeholder="+49 ..."
+                        />
+
+                        <label for="contact-2">Trusted contact 2</label>
+                        <input
+                            id="contact-2"
+                            name="contact_2"
+                            type="tel"
+                            placeholder="+49 ..."
+                        />
+
+                        <label for="contact-3">Trusted contact 3</label>
+                        <input
+                            id="contact-3"
+                            name="contact_3"
+                            type="tel"
+                            placeholder="+49 ..."
+                        />
+
+                        <button type="button" class="circle-form__submit">
+                            Save circle
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </main>

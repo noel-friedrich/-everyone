@@ -1,0 +1,109 @@
+<% content_for :title, "studio" %>
+
+<canvas
+    id="flow-canvas"
+    class="flow-canvas"
+    data-controller="flow"
+    aria-hidden="true"
+></canvas>
+
+<a href="/" class="logo-container" aria-label="@everyone home">
+    <%= image_tag "logo-with-text.png", alt: "@everyone logo", class: "logo logo--studio" %>
+</a>
+
+<main class="studio-page">
+    <section class="studio-top">
+        <h1>Contact Studio</h1>
+        <p>Manage the people who will be contacted when you trigger an alert.</p>
+        <div class="studio-alert-row" role="group" aria-label="Alert actions">
+            <button type="button" class="studio-alert-chip is-primary">
+                ALERT
+            </button>
+            <button type="button" class="studio-alert-chip">Soft Alert</button>
+            <button type="button" class="studio-alert-chip">
+                Alert Settings
+            </button>
+            <button type="button" class="studio-alert-chip">
+                Test Contacts
+            </button>
+        </div>
+    </section>
+
+    <section
+        class="studio-table-shell"
+        data-controller="studio-contacts"
+        data-studio-contacts-initial-value="<%= json_escape(@contacts.to_json) %>"
+        data-studio-contacts-storage-key-value="studio_contacts_v1"
+    >
+        <div class="studio-table-head">
+            <h2>Your contacts</h2>
+            <button
+                type="button"
+                class="studio-add"
+                data-action="click->studio-contacts#startAdd"
+            >
+                Add another contact
+            </button>
+        </div>
+
+        <div class="studio-status-help">
+            <p><strong>Status guide:</strong></p>
+            <p>
+                Confirmed: this person opted in to being alerted when you press
+                ALERT.
+            </p>
+            <p>Pending: this person has not replied to the opt-in SMS yet.</p>
+            <p>
+                Declined: this person said no. You cannot send another request.
+            </p>
+        </div>
+
+        <div class="studio-editor" data-studio-contacts-target="editor" hidden>
+            <h3 data-studio-contacts-target="editorTitle">Add contact</h3>
+            <form class="studio-editor-form" data-action="submit->studio-contacts#save">
+                <label for="studio-name">Name</label>
+                <input
+                    id="studio-name"
+                    data-studio-contacts-target="nameInput"
+                    type="text"
+                    required
+>
+
+                <label for="studio-phone">Phone</label>
+                <input
+                    id="studio-phone"
+                    data-studio-contacts-target="phoneInput"
+                    type="text"
+                    required
+>
+
+                <div class="studio-editor-actions">
+                    <button type="submit" class="studio-action-btn">
+                        Save contact &amp; send opt-in SMS
+                    </button>
+                    <button
+                        type="button"
+                        class="studio-action-btn"
+                        data-action="click->studio-contacts#cancel"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="studio-table-wrap">
+            <table class="studio-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody data-studio-contacts-target="tbody"></tbody>
+            </table>
+        </div>
+    </section>
+</main>
