@@ -2,7 +2,7 @@ class TwilioVoiceController < ApplicationController
   skip_forgery_protection
   before_action :validate_twilio_request!
 
-  FALLBACK_MESSAGE = "KC needs someone to talk right now.".freeze
+  FALLBACK_MESSAGE = "Your contact needs someone to talk right now.".freeze
 
   def intro
     activation_id = params[:activation_id].to_s

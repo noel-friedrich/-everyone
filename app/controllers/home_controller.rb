@@ -1,5 +1,5 @@
 class HomeController < ApplicationController
-  FALLBACK_MESSAGE = "KC needs someone to talk right now.".freeze
+  FALLBACK_MESSAGE = "Your contact needs someone to talk right now.".freeze
   ESCALATION_PRIORITY_ORDER = {
     "low" => [ 0, 1, 2 ],
     "moderate" => [ 1, 2, 0],
