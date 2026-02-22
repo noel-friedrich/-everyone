@@ -41,6 +41,44 @@ const DEMO_FALLBACK_CONTACTS = [
   { name: "Jordan", phone: "+10000000009" },
   { name: "Parker", phone: "+10000000010" },
 ];
+const ALERT_PROMPT_STEPS = [
+  {
+    key: "feeling",
+    title: "How are you feeling right now?",
+    hint: "Choose the option that best fits right now.",
+    options: [
+      "overwhelmed",
+      "anxious",
+      "panicked",
+      "sad",
+      "angry",
+      "numb",
+      "confused",
+      "unsafe",
+    ],
+  },
+  {
+    key: "trigger",
+    title: "What caused your distress?",
+    hint: "Pick the closest cause so the summary has context.",
+    options: [
+      "panic_attack",
+      "conflict",
+      "work_stress",
+      "family_issue",
+      "relationship_issue",
+      "health_scare",
+      "loneliness",
+      "other",
+    ],
+  },
+  {
+    key: "urgency",
+    title: "How urgent is your request?",
+    hint: "This affects who gets called first.",
+    options: ["low", "moderate", "high"],
+  },
+];
 
 function stageBucketForStatus(status) {
   if (status === "ready") return null;
@@ -135,6 +173,11 @@ export default class extends Controller {
     "alertButton",
     "cancelButton",
     "error",
+    "intakeCard",
+    "intakeProgress",
+    "intakeTitle",
+    "intakeHint",
+    "intakeOptions",
     "stage",
     "iconLayer",
     "callingZone",
@@ -153,6 +196,10 @@ export default class extends Controller {
     this.demoMode = new URLSearchParams(window.location.search).has("demo");
     this.autoStartRequested = !this.demoMode;
     this.autoStartAttempted = false;
+    this.promptSteps = ALERT_PROMPT_STEPS;
+    this.promptStepIndex = 0;
+    this.promptCompleted = this.demoMode;
+    this.intakeAnswers = this.initialIntakeAnswers();
     this.contacts = [];
     this.sessionId = null;
     this.sessionStatus = "idle";
@@ -313,6 +360,11 @@ export default class extends Controller {
   }
 
   async startAlert() {
+    if (!this.demoMode && !this.promptCompleted) {
+      this.showPrompt();
+      return;
+    }
+
     if (this.contacts.length === 0 && this.demoMode) {
       this.setError("No confirmed contacts available.");
       return;
@@ -338,9 +390,9 @@ export default class extends Controller {
     const payload = {
       user_id: Number(this.pageParams.get("user_id")) || DEFAULT_INITIATE_USER_ID,
       escalation_level: this.pageParams.get("escalation_level") || "low",
-      feeling: this.pageParams.get("feeling") || "overwhelmed",
-      trigger: this.pageParams.get("trigger") || "unspecified",
-      urgency: this.pageParams.get("urgency") || "high",
+      feeling: this.intakeAnswers.feeling,
+      trigger: this.intakeAnswers.trigger,
+      urgency: this.intakeAnswers.urgency,
     };
 
     try {
@@ -706,9 +758,95 @@ export default class extends Controller {
     if (!this.autoStartRequested) return;
     if (this.autoStartAttempted) return;
     if (this.sessionStatus !== "idle") return;
+    if (!this.promptCompleted) {
+      this.showPrompt();
+      return;
+    }
 
     this.autoStartAttempted = true;
     this.startAlert();
+  }
+
+  initialIntakeAnswers() {
+    return {
+      feeling: this.pageParams.get("feeling") || "overwhelmed",
+      trigger: this.pageParams.get("trigger") || "unspecified",
+      urgency: this.normalizeUrgency(this.pageParams.get("urgency")),
+    };
+  }
+
+  normalizeUrgency(rawValue) {
+    const value = String(rawValue || "").toLowerCase();
+    if (["low", "moderate", "high"].includes(value)) return value;
+    return "high";
+  }
+
+  choosePromptOption(event) {
+    const button = event.currentTarget;
+    const key = button.dataset.key;
+    const value = button.dataset.value;
+    if (!key || !value) return;
+
+    this.intakeAnswers[key] = key === "urgency" ? this.normalizeUrgency(value) : value;
+
+    if (this.promptStepIndex >= this.promptSteps.length - 1) {
+      this.promptCompleted = true;
+      this.hidePrompt();
+      this.maybeAutoStart();
+      return;
+    }
+
+    this.promptStepIndex += 1;
+    this.renderIntakePrompt();
+  }
+
+  skipPrompts() {
+    this.promptCompleted = true;
+    this.hidePrompt();
+    this.maybeAutoStart();
+  }
+
+  showPrompt() {
+    if (this.promptCompleted || !this.hasIntakeCardTarget) return;
+    this.intakeCardTarget.hidden = false;
+    this.renderIntakePrompt();
+  }
+
+  hidePrompt() {
+    if (!this.hasIntakeCardTarget) return;
+    this.intakeCardTarget.hidden = true;
+  }
+
+  renderIntakePrompt() {
+    if (!this.hasIntakeCardTarget) return;
+    const step = this.promptSteps[this.promptStepIndex];
+    if (!step) return;
+
+    this.intakeProgressTarget.textContent = `Step ${this.promptStepIndex + 1} of ${this.promptSteps.length}`;
+    this.intakeTitleTarget.textContent = step.title;
+    this.intakeHintTarget.textContent = step.hint;
+    this.intakeOptionsTarget.innerHTML = step.options
+      .map((option) => {
+        const selected = this.intakeAnswers[step.key] === option;
+        return `
+          <button
+            type="button"
+            class="studio-alert-chip alert-intake__option${selected ? " is-primary" : ""}"
+            data-key="${escapeHtml(step.key)}"
+            data-value="${escapeHtml(option)}"
+            data-action="click->alert#choosePromptOption"
+          >
+            ${escapeHtml(this.promptOptionLabel(option))}
+          </button>
+        `;
+      })
+      .join("");
+  }
+
+  promptOptionLabel(value) {
+    return String(value)
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (char) => char.toUpperCase());
   }
 
   applyContactUpdate(entry) {
@@ -929,7 +1067,7 @@ export default class extends Controller {
     );
 
     if (total === 0) {
-      this.alertButtonTarget.disabled = true;
+      this.alertButtonTarget.disabled = this.demoMode;
       this.cancelButtonTarget.disabled = true;
       this.tbodyTarget.innerHTML = `
         <tr>
@@ -937,6 +1075,7 @@ export default class extends Controller {
         </tr>
       `;
       this.renderStage();
+      if (!this.promptCompleted) this.showPrompt();
       return;
     }
 
@@ -952,5 +1091,6 @@ export default class extends Controller {
 
     this.renderStage();
     this.renderTableRows();
+    if (!this.promptCompleted) this.showPrompt();
   }
 }

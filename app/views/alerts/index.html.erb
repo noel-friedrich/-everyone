@@ -18,6 +18,27 @@
     </section>
 
     <section class="studio-table-shell alert-shell" data-controller="alert">
+        <div class="alert-intake" data-alert-target="intakeCard" hidden>
+            <div class="alert-intake__head">
+                <p class="alert-intake__eyebrow">Before we call</p>
+                <p class="alert-intake__progress" data-alert-target="intakeProgress"></p>
+            </div>
+            <h2 data-alert-target="intakeTitle">How are you feeling right now?</h2>
+            <p class="alert-intake__hint" data-alert-target="intakeHint">
+                Choose the option that is closest. You can skip this and call immediately.
+            </p>
+            <div class="alert-intake__options" data-alert-target="intakeOptions"></div>
+            <div class="alert-intake__actions">
+                <button
+                    type="button"
+                    class="studio-action-btn"
+                    data-action="click->alert#skipPrompts"
+                >
+                    Skip prompts
+                </button>
+            </div>
+        </div>
+
         <div class="alert-controls">
             <button
                 type="button"
