@@ -16,7 +16,11 @@ Rails.application.routes.draw do
   get "consent" => "consents#show", as: :consent
   post "consent/respond" => "consents#respond", as: :consent_respond
   post "initiate_call" => "home#initiate_call", as: :initiate_call
+  post "initiate_all" => "home#initiate_call", as: :initiate_all
 
+  post "twilio/voice/intro" => "twilio_voice#intro", as: :twilio_voice_intro
+  post "twilio/voice/accept" => "twilio_voice#accept", as: :twilio_voice_accept
+  post "twilio/voice/status" => "twilio_voice#status", as: :twilio_voice_status
   namespace :api do
     post "token" => "calls#token"
     post "call_everyone" => "calls#call_everyone"
