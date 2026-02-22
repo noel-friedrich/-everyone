@@ -2,6 +2,7 @@ import { Controller } from "@hotwired/stimulus";
 import { ensureClientUid } from "client_uid";
 
 const CONTACT_STORAGE_KEY = "studio_contacts_v1";
+const DEFAULT_INITIATE_USER_ID = 1;
 const E164_REGEX = /^\+[1-9]\d{1,14}$/;
 const FINAL_CALL_STATUSES = new Set([
   "joined",
@@ -148,7 +149,10 @@ export default class extends Controller {
 
   connect() {
     this.clientUid = ensureClientUid();
+    this.pageParams = new URLSearchParams(window.location.search);
     this.demoMode = new URLSearchParams(window.location.search).has("demo");
+    this.autoStartRequested = !this.demoMode;
+    this.autoStartAttempted = false;
     this.contacts = [];
     this.sessionId = null;
     this.sessionStatus = "idle";
@@ -171,7 +175,7 @@ export default class extends Controller {
         this.startDemoSequence();
       }, 500);
     } else {
-      this.loadConfirmedContacts();
+      this.loadConfirmedContacts().then(() => this.maybeAutoStart());
       this.syncTimer = window.setInterval(
         () => this.loadConfirmedContacts(),
         15000,
@@ -309,7 +313,7 @@ export default class extends Controller {
   }
 
   async startAlert() {
-    if (this.contacts.length === 0) {
+    if (this.contacts.length === 0 && this.demoMode) {
       this.setError("No confirmed contacts available.");
       return;
     }
@@ -332,13 +336,15 @@ export default class extends Controller {
     this.render();
 
     const payload = {
-      numbers: this.contacts.map((contact) => contact.phone),
-      room_name: `alert-${Date.now()}`,
-      caller_name: "Alert",
+      user_id: Number(this.pageParams.get("user_id")) || DEFAULT_INITIATE_USER_ID,
+      escalation_level: this.pageParams.get("escalation_level") || "low",
+      feeling: this.pageParams.get("feeling") || "overwhelmed",
+      trigger: this.pageParams.get("trigger") || "unspecified",
+      urgency: this.pageParams.get("urgency") || "high",
     };
 
     try {
-      const response = await fetch("/api/call_everyone", {
+      const response = await fetch("/initiate_call", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -347,7 +353,7 @@ export default class extends Controller {
         body: JSON.stringify(payload),
       });
       if (!response.ok)
-        throw new Error(`call_everyone failed (${response.status})`);
+        throw new Error(`initiate_call failed (${response.status})`);
 
       const data = await response.json();
 
@@ -372,12 +378,14 @@ export default class extends Controller {
         return;
       }
 
-      this.sessionId = data.session_id;
-      this.sessionStatus = data.status || "calling";
+      this.sessionId = data.session_id || null;
+      this.sessionStatus = data.session_status || "calling";
       this.applyContactsFromServer(data.contacts || []);
-      this.openStream(
-        data.stream_url || `/api/calls/sessions/${this.sessionId}/stream`,
-      );
+      if (this.sessionId) {
+        this.openStream(
+          data.stream_url || `/api/calls/sessions/${this.sessionId}/stream`,
+        );
+      }
     } catch (error) {
       if (requestId !== this.startRequestId) return;
       this.setError("Could not start alert calls.");
@@ -662,7 +670,17 @@ export default class extends Controller {
     const byPhone = new Map(this.contacts.map((c) => [c.phone, c]));
     serverContacts.forEach((entry) => {
       const phone = normalizePhone(entry.phone_number || entry.number);
-      if (!phone || !byPhone.has(phone)) return;
+      if (!phone) return;
+
+      if (!byPhone.has(phone)) {
+        byPhone.set(phone, {
+          name: entry.name || phone,
+          phone,
+          callStatus: "ready",
+          callSid: null,
+          lastEventAt: null,
+        });
+      }
 
       const current = byPhone.get(phone);
       byPhone.set(phone, {
@@ -681,6 +699,16 @@ export default class extends Controller {
     if (!hasActive && this.sessionStatus !== "calling") {
       this.alertButtonTarget.disabled = false;
     }
+  }
+
+  maybeAutoStart() {
+    if (this.demoMode) return;
+    if (!this.autoStartRequested) return;
+    if (this.autoStartAttempted) return;
+    if (this.sessionStatus !== "idle") return;
+
+    this.autoStartAttempted = true;
+    this.startAlert();
   }
 
   applyContactUpdate(entry) {

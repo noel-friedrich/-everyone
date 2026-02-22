@@ -50,13 +50,23 @@ class HomeController < ApplicationController
     end
 
     room_name = "activation_#{activation_id}"
-    call_results = call_contacts_in_batches(
-      contacts: ordered_contacts,
+    session = CallSession.create!(
       room_name: room_name,
       caller_name: user.name.presence || "Someone",
-      escalation_level: escalation_level
+      status: "calling"
     )
-    call_sids = call_results.flat_map { |batch| batch[:results].map { |r| r[:call_sid] } }.compact
+    session_contacts = build_session_contacts(session, ordered_contacts)
+
+    call_results = call_contacts_in_batches(
+      contacts: ordered_contacts,
+      session_contacts: session_contacts,
+      room_name: room_name,
+      caller_name: user.name.presence || "Someone",
+      escalation_level: escalation_level,
+      base_url: public_base_url
+    )
+    session.refresh_status!
+    call_sids = session.call_session_contacts.where.not(call_sid: nil).pluck(:call_sid)
 
     Rails.cache.write(
       activation_cache_key(activation_id),
@@ -82,6 +92,11 @@ class HomeController < ApplicationController
           summary_text: summary_text,
           escalation_level: escalation_level,
           room_name: room_name,
+          session_id: session.id,
+          session_status: session.status,
+          stream_url: "/api/calls/sessions/#{session.id}/stream",
+          state_url: "/api/calls/sessions/#{session.id}",
+          contacts: session.call_session_contacts.order(:id).map { |contact| contact_payload(contact) },
           routed_contact_ids: ordered_contacts.map(&:id),
           batches: call_results.map do |batch|
             {
@@ -169,19 +184,28 @@ class HomeController < ApplicationController
     contact.response_count.fdiv(attempts)
   end
 
-  def call_contacts_in_batches(contacts:, room_name:, caller_name:, escalation_level:)
+  def call_contacts_in_batches(
+    contacts:,
+    session_contacts:,
+    room_name:,
+    caller_name:,
+    escalation_level:,
+    base_url:
+  )
     service = TwilioService.new
     ordered_groups = ESCALATION_PRIORITY_ORDER.fetch(escalation_level)
     priority_groups = contacts.group_by { |contact| contact_priority_value(contact) }
+    session_contacts_by_phone = session_contacts.index_by(&:phone_number)
     requested_order = ordered_groups.select { |priority| priority_groups.key?(priority) }
 
     requested_order.each.with_index(1).map do |priority, batch_number|
       group_contacts = priority_groups.fetch(priority, [])
-      numbers = group_contacts.map(&:phone_e164)
-      results = service.call_everyone(
-        numbers: numbers,
+      tracked_contacts = group_contacts.filter_map { |contact| session_contacts_by_phone[contact.phone_e164] }
+      results = service.call_everyone_with_tracking(
+        session_contacts: tracked_contacts,
         room_name: room_name,
-        caller_name: caller_name
+        caller_name: caller_name,
+        base_url: base_url
       )
 
       {
@@ -201,5 +225,31 @@ class HomeController < ApplicationController
 
   def priority_label(priority_value)
     Contact.priorities.key(priority_value).to_s
+  end
+
+  def build_session_contacts(session, contacts)
+    contacts.map do |contact|
+      session.call_session_contacts.create!(
+        phone_number: contact.phone_e164,
+        status: "queued",
+        last_event_at: Time.current
+      )
+    end
+  end
+
+  def public_base_url
+    ENV["PUBLIC_BASE_URL"].to_s.strip.presence || request.base_url
+  end
+
+  def contact_payload(contact)
+    {
+      id: contact.id,
+      phone_number: contact.phone_number,
+      call_sid: contact.call_sid,
+      status: contact.status,
+      error_message: contact.error_message,
+      last_event_at: contact.last_event_at&.iso8601,
+      updated_at: contact.updated_at&.iso8601
+    }
   end
 end
