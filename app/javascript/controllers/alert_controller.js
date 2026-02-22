@@ -2,6 +2,7 @@ import { Controller } from "@hotwired/stimulus";
 import { ensureClientUid } from "client_uid";
 
 const CONTACT_STORAGE_KEY = "studio_contacts_v1";
+const AUTO_CANCEL_TOGGLE_STORAGE_KEY = "alert_auto_cancel_on_accept_v1";
 const E164_REGEX = /^\+[1-9]\d{1,14}$/;
 const FINAL_CALL_STATUSES = new Set([
   "joined",
@@ -201,6 +202,7 @@ export default class extends Controller {
     "declinedCount",
     "noResponseCount",
     "acceptedCount",
+    "autoCancelToggle",
   ];
 
   connect() {
@@ -227,6 +229,7 @@ export default class extends Controller {
     this.layoutRaf = null;
     this.handleKeydown = this.handleKeydown.bind(this);
     this.handleResize = this.handleResize.bind(this);
+    this.loadAutoCancelOnAcceptPreference();
 
     if (this.demoMode) {
       this.resetDemoContacts();
@@ -448,6 +451,7 @@ export default class extends Controller {
       numbers: this.contacts.map((contact) => contact.phone),
       room_name: `alert-${Date.now()}`,
       caller_name: "Alert",
+      abort_on_accept: this.autoCancelOnAcceptEnabled(),
     };
 
     try {
@@ -514,6 +518,31 @@ export default class extends Controller {
     }
 
     this.render();
+  }
+
+  loadAutoCancelOnAcceptPreference() {
+    if (!this.hasAutoCancelToggleTarget) return;
+
+    const stored = localStorage.getItem(AUTO_CANCEL_TOGGLE_STORAGE_KEY);
+    if (stored === null) {
+      this.autoCancelToggleTarget.checked = true;
+      return;
+    }
+
+    this.autoCancelToggleTarget.checked = stored === "true";
+  }
+
+  toggleAutoCancelOnAccept() {
+    if (!this.hasAutoCancelToggleTarget) return;
+    localStorage.setItem(
+      AUTO_CANCEL_TOGGLE_STORAGE_KEY,
+      this.autoCancelToggleTarget.checked ? "true" : "false",
+    );
+  }
+
+  autoCancelOnAcceptEnabled() {
+    if (!this.hasAutoCancelToggleTarget) return true;
+    return this.autoCancelToggleTarget.checked;
   }
 
   async cancelAlert() {

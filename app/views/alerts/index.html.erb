@@ -69,6 +69,24 @@
                 Manage Contacts
             </a>
         </div>
+        <div class="alert-setting-row">
+            <label class="alert-setting-toggle">
+                <input
+                    type="checkbox"
+                    class="alert-setting-toggle__input"
+                    data-alert-target="autoCancelToggle"
+                    data-action="change->alert#toggleAutoCancelOnAccept"
+                    checked
+                >
+                <span class="alert-setting-toggle__visual" aria-hidden="true"></span>
+                <span class="alert-setting-toggle__copy">
+                    <strong>Stop after first accept</strong>
+                    <small>
+                        If enabled, all other outgoing calls are canceled as soon as one person accepts.
+                    </small>
+                </span>
+            </label>
+        </div>
 
         <div class="alert-meta">
             <div class="alert-stage" data-alert-target="stage">

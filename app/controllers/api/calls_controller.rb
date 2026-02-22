@@ -3,6 +3,9 @@ module Api
     include ActionController::Live
 
     E164_REGEX = /\A\+[1-9]\d{1,14}\z/
+    STREAM_POLL_INTERVAL_SECONDS = 1
+    STREAM_MAX_OPEN_SECONDS = 20
+    STREAM_MAX_OPEN_SECONDS_DEVELOPMENT = 5
 
     # -----------------------------------------------------------------
     # POST /api/token
@@ -27,6 +30,7 @@ module Api
       caller_name = params[:caller_name].to_s.strip.presence || "Someone"
       conference_name = params[:conference_name].to_s.strip
       conference_name = "alert-session-#{SecureRandom.hex(8)}" if conference_name.blank?
+      abort_on_accept = boolean_param(params[:abort_on_accept], default: true)
       numbers = normalize_numbers(params.require(:numbers))
 
       if room_name.blank?
@@ -41,6 +45,7 @@ module Api
         room_name: room_name,
         caller_name: caller_name,
         conference_name: conference_name,
+        auto_cancel_on_accept: abort_on_accept,
         status: "calling"
       )
 
@@ -101,9 +106,12 @@ module Api
       stream.write sse_event("snapshot", session_payload(session.reload))
       last_seen_at = session.updated_at || Time.current
       completed_since = nil
+      stream_started_at = Time.current
 
       ActiveRecord::Base.connection_pool.with_connection do
         loop do
+          break if (Time.current - stream_started_at) >= stream_max_open_seconds
+
           changed_contacts = session.call_session_contacts
                                     .where("updated_at > ?", last_seen_at)
                                     .order(updated_at: :asc, id: :asc)
@@ -125,6 +133,7 @@ module Api
             completed_since = session.status == "completed" ? Time.current : nil
           else
             stream.write ": heartbeat\n\n"
+            session.reload
 
             if session.status == "completed"
               completed_since ||= Time.current
@@ -138,7 +147,7 @@ module Api
             end
           end
 
-          sleep 1
+          sleep STREAM_POLL_INTERVAL_SECONDS
         end
       end
     rescue ActiveRecord::RecordNotFound
@@ -197,32 +206,53 @@ module Api
       return render xml: invalid_callback_twiml, content_type: "text/xml" unless contact
 
       digits = params[:Digits].to_s.strip
-      next_status =
-        if digits == "1"
-          "joined"
-        elsif digits.blank?
-          "declined"
-        else
-          "declined"
-        end
-
-      updates = {
-        status: next_status,
-        last_event_at: Time.current
-      }
-
+      session = contact.call_session
       call_sid = params[:CallSid].to_s.strip
-      updates[:call_sid] = call_sid if call_sid.present? && contact.call_sid.blank?
-      contact.update!(updates)
-      contact.call_session.refresh_status!
-      summary_message = summary_message_for_contact(contact)
+      should_cancel_others = false
+      call_sids_to_hangup = []
+      summary_message = nil
 
-      twiml =
+      twiml = nil
+
+      session.with_lock do
+        session.reload
+        contact.reload
+
+        updates = { last_event_at: Time.current }
+        updates[:call_sid] = call_sid if call_sid.present? && contact.call_sid.blank?
+
         if digits == "1"
-          accepted_twiml(summary_message:)
+          winner_id = session.connected_contact_id
+
+          if winner_id.present? && winner_id != contact.id
+            updates[:status] = "canceled" unless CallSessionContact::FINAL_STATUSES.include?(contact.status)
+            contact.update!(updates) if updates.any?
+            twiml = already_accepted_twiml
+          else
+            updates[:status] = "joined"
+            contact.update!(updates)
+
+            if winner_id.blank?
+              session.update!(connected_contact_id: contact.id)
+              if session.auto_cancel_on_accept?
+                should_cancel_others = true
+                call_sids_to_hangup = mark_other_contacts_canceled!(session:, winner_contact: contact)
+              end
+            end
+
+            summary_message = summary_message_for_contact(contact)
+            twiml = accepted_twiml(summary_message:)
+          end
         else
-          decline_twiml
+          updates[:status] = "declined"
+          contact.update!(updates)
+          twiml = decline_twiml
         end
+
+        session.refresh_status!
+      end
+
+      hangup_other_calls(call_sids_to_hangup) if should_cancel_others && call_sids_to_hangup.any?
 
       render xml: twiml, content_type: "text/xml"
     rescue StandardError => e
@@ -321,6 +351,10 @@ module Api
     end
 
     def map_twilio_status(call_status:, current_status:)
+      if CallSessionContact::FINAL_STATUSES.include?(current_status) && current_status != "joined"
+        return current_status
+      end
+
       case call_status
       when "queued", "initiated"
         "calling"
@@ -369,6 +403,14 @@ module Api
       end.to_s
     end
 
+    def already_accepted_twiml
+      Twilio::TwiML::VoiceResponse.new do |r|
+        r.say(voice: "alice", message: "Someone has already accepted this request. Thank you.")
+        r.say(voice: "alice", message: "Goodbye.")
+        r.hangup
+      end.to_s
+    end
+
     def invalid_callback_twiml
       Twilio::TwiML::VoiceResponse.new do |r|
         r.say(voice: "alice", message: "This link is no longer valid. Goodbye.")
@@ -381,6 +423,7 @@ module Api
         session_id: session.id,
         room_name: session.room_name,
         caller_name: session.caller_name,
+        auto_cancel_on_accept: session.auto_cancel_on_accept,
         status: session.status,
         contacts: session.call_session_contacts.order(:id).map { |contact| contact_payload(contact) },
         created_at: session.created_at&.iso8601,
@@ -419,6 +462,42 @@ module Api
       return nil if text.blank?
 
       text.tr("\n", " ")[0, 500]
+    end
+
+    def boolean_param(raw_value, default:)
+      return true if [true, 1, "1", "true", "on", "yes"].include?(raw_value)
+      return false if [false, 0, "0", "false", "off", "no"].include?(raw_value)
+
+      default
+    end
+
+    def mark_other_contacts_canceled!(session:, winner_contact:)
+      contacts_to_cancel = session.call_session_contacts
+                                 .where.not(id: winner_contact.id)
+                                 .where.not(status: CallSessionContact::FINAL_STATUSES)
+                                 .to_a
+
+      now = Time.current
+      contacts_to_cancel.each do |other_contact|
+        other_contact.update!(
+          status: "canceled",
+          last_event_at: now
+        )
+      end
+
+      contacts_to_cancel.filter_map(&:call_sid).uniq
+    end
+
+    def hangup_other_calls(call_sids)
+      return if call_sids.blank?
+
+      TwilioService.new.hangup_calls(call_sids: call_sids)
+    rescue StandardError => e
+      Rails.logger.warn("[CallsController] Could not hang up competing calls: #{e.class}: #{e.message}")
+    end
+
+    def stream_max_open_seconds
+      Rails.env.development? ? STREAM_MAX_OPEN_SECONDS_DEVELOPMENT : STREAM_MAX_OPEN_SECONDS
     end
   end
 end
