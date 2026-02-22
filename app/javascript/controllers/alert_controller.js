@@ -2,7 +2,6 @@ import { Controller } from "@hotwired/stimulus";
 import { ensureClientUid } from "client_uid";
 
 const CONTACT_STORAGE_KEY = "studio_contacts_v1";
-const DEFAULT_INITIATE_USER_ID = 1;
 const E164_REGEX = /^\+[1-9]\d{1,14}$/;
 const FINAL_CALL_STATUSES = new Set([
   "joined",
@@ -314,25 +313,26 @@ export default class extends Controller {
       );
       const statusesByHash = await this.bulkLookup(hashes);
 
-      const confirmedLocalContacts = localContacts
-        .filter(
-          (contact, index) => statusesByHash[hashes[index]] === "confirmed",
-        );
-      const combinedContacts = mergeAlertContactsByPhone(confirmedLocalContacts, dbContacts);
+      const confirmedLocalContacts = localContacts.filter(
+        (contact, index) => statusesByHash[hashes[index]] === "confirmed",
+      );
+      const combinedContacts = mergeAlertContactsByPhone(
+        confirmedLocalContacts,
+        dbContacts,
+      );
       if (this.hasLiveCallInProgress()) return;
       const previousByPhone = new Map(this.contacts.map((c) => [c.phone, c]));
 
-      this.contacts = combinedContacts
-        .map((contact) => {
-          const previous = previousByPhone.get(contact.phone);
-          return {
-            name: contact.name,
-            phone: contact.phone,
-            callStatus: previous?.callStatus || "ready",
-            callSid: previous?.callSid || null,
-            lastEventAt: previous?.lastEventAt || null,
-          };
-        });
+      this.contacts = combinedContacts.map((contact) => {
+        const previous = previousByPhone.get(contact.phone);
+        return {
+          name: contact.name,
+          phone: contact.phone,
+          callStatus: previous?.callStatus || "ready",
+          callSid: previous?.callSid || null,
+          lastEventAt: previous?.lastEventAt || null,
+        };
+      });
     } catch (error) {
       this.setError("Could not load confirmed contacts.");
       console.error(error);
@@ -354,7 +354,9 @@ export default class extends Controller {
       const raw = this.element.dataset.alertDbContacts || "[]";
       const parsed = JSON.parse(raw);
       return Array.isArray(parsed)
-        ? parsed.map(sanitizeLocalContact).filter((contact) => contact.name && contact.phone)
+        ? parsed
+            .map(sanitizeLocalContact)
+            .filter((contact) => contact.name && contact.phone)
         : [];
     } catch (_) {
       return [];
@@ -420,7 +422,7 @@ export default class extends Controller {
       return;
     }
 
-    if (this.contacts.length === 0 && this.demoMode) {
+    if (this.contacts.length === 0) {
       this.setError("No confirmed contacts available.");
       return;
     }
@@ -443,15 +445,13 @@ export default class extends Controller {
     this.render();
 
     const payload = {
-      user_id: Number(this.pageParams.get("user_id")) || DEFAULT_INITIATE_USER_ID,
-      escalation_level: this.pageParams.get("escalation_level") || "low",
-      feeling: this.intakeAnswers.feeling,
-      trigger: this.intakeAnswers.trigger,
-      urgency: this.intakeAnswers.urgency,
+      numbers: this.contacts.map((contact) => contact.phone),
+      room_name: `alert-${Date.now()}`,
+      caller_name: "Alert",
     };
 
     try {
-      const response = await fetch("/initiate_call", {
+      const response = await fetch("/api/call_everyone", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -459,8 +459,20 @@ export default class extends Controller {
         },
         body: JSON.stringify(payload),
       });
-      if (!response.ok)
-        throw new Error(`initiate_call failed (${response.status})`);
+      if (!response.ok) {
+        let serverMessage = `call_everyone failed (${response.status})`;
+        try {
+          const payload = await response.json();
+          serverMessage =
+            payload?.message ||
+            payload?.error ||
+            payload?.status ||
+            serverMessage;
+        } catch (_) {
+          // Ignore JSON parse errors and keep generic message.
+        }
+        throw new Error(serverMessage);
+      }
 
       const data = await response.json();
 
@@ -486,7 +498,7 @@ export default class extends Controller {
       }
 
       this.sessionId = data.session_id || null;
-      this.sessionStatus = data.session_status || "calling";
+      this.sessionStatus = data.session_status || data.status || "calling";
       this.applyContactsFromServer(data.contacts || []);
       if (this.sessionId) {
         this.openStream(
@@ -495,7 +507,7 @@ export default class extends Controller {
       }
     } catch (error) {
       if (requestId !== this.startRequestId) return;
-      this.setError("Could not start alert calls.");
+      this.setError(error?.message || "Could not start alert calls.");
       this.alertButtonTarget.disabled = false;
       this.alertButtonTarget.hidden = false;
       console.error(error);
@@ -853,7 +865,8 @@ export default class extends Controller {
     const value = button.dataset.value;
     if (!key || !value) return;
 
-    this.intakeAnswers[key] = key === "urgency" ? this.normalizeUrgency(value) : value;
+    this.intakeAnswers[key] =
+      key === "urgency" ? this.normalizeUrgency(value) : value;
 
     if (this.promptStepIndex >= this.promptSteps.length - 1) {
       this.promptCompleted = true;
@@ -1128,10 +1141,7 @@ export default class extends Controller {
   }
 
   updateAlertButtonLabel(total) {
-    const displayCount =
-      this.sessionId || this.sessionStatus === "calling"
-        ? total
-        : this.dbContactCount;
+    const displayCount = total > 0 ? total : this.dbContactCount;
     const suffix = displayCount === 1 ? "" : "S";
     this.alertButtonTarget.textContent = `CALL ${displayCount} CONTACT${suffix}`;
   }
@@ -1142,10 +1152,12 @@ export default class extends Controller {
       ACTIVE_CALL_STATUSES.has(c.callStatus),
     );
     this.updateAlertButtonLabel(total);
-
-    if (!this.demoMode && !this.promptCompleted && !this.intakeCardTarget.hidden) {
-      this.alertButtonTarget.hidden = true;
-    }
+    const shouldHideAlertButton =
+      !this.demoMode &&
+      !this.promptCompleted &&
+      this.hasIntakeCardTarget &&
+      !this.intakeCardTarget.hidden;
+    this.alertButtonTarget.hidden = shouldHideAlertButton;
 
     if (total === 0) {
       this.alertButtonTarget.disabled = this.demoMode;

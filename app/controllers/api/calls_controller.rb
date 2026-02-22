@@ -25,6 +25,8 @@ module Api
     def call_everyone
       room_name = params.require(:room_name).to_s.strip
       caller_name = params[:caller_name].to_s.strip.presence || "Someone"
+      conference_name = params[:conference_name].to_s.strip
+      conference_name = "alert-session-#{SecureRandom.hex(8)}" if conference_name.blank?
       numbers = normalize_numbers(params.require(:numbers))
 
       if room_name.blank?
@@ -38,6 +40,7 @@ module Api
       session = CallSession.create!(
         room_name: room_name,
         caller_name: caller_name,
+        conference_name: conference_name,
         status: "calling"
       )
 
@@ -68,6 +71,8 @@ module Api
       render json: { error: e.message }, status: :unprocessable_entity
     rescue ActiveRecord::RecordInvalid => e
       render json: { error: e.record.errors.full_messages.join(", ") }, status: :unprocessable_entity
+    rescue ActiveRecord::NotNullViolation => e
+      render json: { error: e.message }, status: :unprocessable_entity
     end
 
     # -----------------------------------------------------------------

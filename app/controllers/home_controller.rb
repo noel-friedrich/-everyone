@@ -18,8 +18,9 @@ class HomeController < ApplicationController
       urgency: params[:urgency].presence || "high"
     }
     user_id = params[:user_id].presence&.to_i || 1
-    user = User.find(user_id)
-    all_contacts = user.contacts.where(active: true, consent_status: :confirmed).to_a
+    user = User.find_by(id: user_id)
+    all_contacts = Contact.where(user_id: user_id, active: true, consent_status: :confirmed).to_a
+    caller_name = user&.name.presence || "Someone"
 
     summary_payload = AgentServiceClient.new.start_activation(
       activation_id: activation_id,
@@ -68,7 +69,8 @@ class HomeController < ApplicationController
 
     session = CallSession.create!(
       room_name: room_name,
-      caller_name: user.name.presence || "Someone",
+      caller_name: caller_name,
+      conference_name: room_name,
       status: "calling"
     )
     session_contacts = build_session_contacts(session, ordered_contacts)
@@ -77,7 +79,7 @@ class HomeController < ApplicationController
       contacts: ordered_contacts,
       session_contacts: session_contacts,
       room_name: room_name,
-      caller_name: user.name.presence || "Someone",
+      caller_name: caller_name,
       escalation_level: escalation_level,
       base_url: public_base_url,
       summary_text: summary_text,
