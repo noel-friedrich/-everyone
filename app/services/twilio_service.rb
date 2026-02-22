@@ -43,14 +43,15 @@ class TwilioService
   # Returns an array of results per number:
   #   [{ number: "+1...", call_sid: "CA...", status: "calling" }, ...]
   # -------------------------------------------------------------------
-  def call_everyone(numbers:, room_name:, caller_name: "Someone", summary_message: nil)
+  def call_everyone(numbers:, room_name:, caller_name: "Someone", summary_message: nil, waiting_room_message: nil)
     twiml_bin_url = ENV.fetch("TWILIO_TWIML_BIN_URL")
     gather_action_url = "#{twiml_bin_url}?RoomName=#{CGI.escape(room_name)}"
 
     contact_twiml = contact_call_twiml(
       caller_name: caller_name,
       gather_action_url: gather_action_url,
-      summary_message: summary_message
+      summary_message: summary_message,
+      waiting_room_message: waiting_room_message
     )
 
     results = []
@@ -82,7 +83,7 @@ class TwilioService
   # Each contact receives unique gather/status callback URLs so their
   # status can be updated live in the database.
   # -------------------------------------------------------------------
-  def call_everyone_with_tracking(session_contacts:, room_name:, caller_name:, base_url:, summary_message: nil)
+  def call_everyone_with_tracking(session_contacts:, room_name:, caller_name:, base_url:, summary_message: nil, waiting_room_message: nil)
     results = []
 
     session_contacts.each do |contact|
@@ -91,7 +92,8 @@ class TwilioService
       contact_twiml = contact_call_twiml(
         caller_name: caller_name,
         gather_action_url: gather_action_url,
-        summary_message: summary_message
+        summary_message: summary_message,
+        waiting_room_message: waiting_room_message
       )
 
       begin
@@ -189,8 +191,9 @@ class TwilioService
 
   private
 
-  def contact_call_twiml(caller_name:, gather_action_url:, summary_message: nil)
+  def contact_call_twiml(caller_name:, gather_action_url:, summary_message: nil, waiting_room_message: nil)
     spoken_summary = normalized_summary_message(summary_message)
+    spoken_waiting_room = normalized_waiting_room_message(waiting_room_message)
 
     Twilio::TwiML::VoiceResponse.new do |r|
       r.say(
@@ -208,12 +211,17 @@ class TwilioService
           message: "Press 1 to accept this alert request. Or hang up if you can't right now."
         )
       end
-      r.pause(length: 5) if spoken_summary.present?
+      r.pause(length: 3) if spoken_summary.present?
       r.say(
         voice: "alice",
         message: spoken_summary
       ) if spoken_summary.present?
       if spoken_summary.present?
+        r.pause(length: 10) if spoken_waiting_room.present?
+        r.say(
+          voice: "alice",
+          message: spoken_waiting_room
+        ) if spoken_waiting_room.present?
         r.say(
           voice: "alice",
           message: "Please stay on the line."
@@ -241,5 +249,12 @@ class TwilioService
     return nil if text.blank?
 
     text.tr("\n", " ")[0, 500]
+  end
+
+  def normalized_waiting_room_message(message)
+    text = message.to_s.strip
+    return nil if text.blank?
+
+    text.tr("\n", " ")[0, 450]
   end
 end

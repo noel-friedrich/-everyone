@@ -60,7 +60,7 @@ class TwilioVoiceController < ApplicationController
       Rails.logger.info("twilio_accept activation_id=#{activation_id} accepted_call_sid=#{call_sid}")
     end
 
-    response.say(message: "Thank you. You are now the confirmed responder.", voice: "alice")
+    # response.say(message: "Thank you. You are now the confirmed responder.", voice: "alice")
     response.hangup
     render_twiml(response)
   end

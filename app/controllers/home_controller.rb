@@ -29,6 +29,8 @@ class HomeController < ApplicationController
       contacts: router_contacts_payload(all_contacts)
     )
     summary_text = summary_payload&.dig("summary_text").presence || FALLBACK_MESSAGE
+    waiting_room_plan = summary_payload&.dig("waiting_room_plan")
+    waiting_room_message = waiting_room_plan.is_a?(Hash) ? waiting_room_plan["script"] : nil
     ordered_contacts = ordered_contacts_from_router(
       all_contacts: all_contacts,
       summary_payload: summary_payload,
@@ -78,7 +80,8 @@ class HomeController < ApplicationController
       caller_name: user.name.presence || "Someone",
       escalation_level: escalation_level,
       base_url: public_base_url,
-      summary_text: summary_text
+      summary_text: summary_text,
+      waiting_room_message: waiting_room_message
     )
     session.refresh_status!
     call_sids = session.call_session_contacts.where.not(call_sid: nil).pluck(:call_sid)
@@ -88,6 +91,7 @@ class HomeController < ApplicationController
       {
         "activation_id" => activation_id,
         "summary_text" => summary_text,
+        "waiting_room_plan" => waiting_room_plan,
         "accepted_call_sid" => nil,
         "room_name" => room_name,
         "escalation_level" => escalation_level,
@@ -105,6 +109,7 @@ class HomeController < ApplicationController
           status: "ok",
           activation_id: activation_id,
           summary_text: summary_text,
+          waiting_room_plan: waiting_room_plan,
           escalation_level: escalation_level,
           room_name: room_name,
           session_id: session.id,
@@ -206,7 +211,8 @@ class HomeController < ApplicationController
     caller_name:,
     escalation_level:,
     base_url:,
-    summary_text:
+    summary_text:,
+    waiting_room_message:
   )
     service = TwilioService.new
     ordered_groups = ESCALATION_PRIORITY_ORDER.fetch(escalation_level)
@@ -222,7 +228,8 @@ class HomeController < ApplicationController
         room_name: room_name,
         caller_name: caller_name,
         base_url: base_url,
-        summary_message: summary_text
+        summary_message: summary_text,
+        waiting_room_message: waiting_room_message
       )
 
       {

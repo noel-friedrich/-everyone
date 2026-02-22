@@ -4,6 +4,7 @@ from app.clients.gemini_client import GeminiClient
 from app.clients.twilio_client import TwilioClient
 from app.schemas import StartActivationRequest, StartActivationResponse
 from app.services.contact_routing import ContactRouter
+from app.services.regulation_micro_agent import RegulationMicroAgent
 
 
 class ActivationOrchestrator:
@@ -12,10 +13,12 @@ class ActivationOrchestrator:
         gemini_client: GeminiClient | None = None,
         twilio_client: TwilioClient | None = None,
         contact_router: ContactRouter | None = None,
+        regulation_micro_agent: RegulationMicroAgent | None = None,
     ) -> None:
         self.gemini_client = gemini_client or GeminiClient()
         self.twilio_client = twilio_client or TwilioClient()
         self.contact_router = contact_router or ContactRouter()
+        self.regulation_micro_agent = regulation_micro_agent or RegulationMicroAgent()
 
     def start(self, payload: StartActivationRequest) -> StartActivationResponse:
         """
@@ -27,6 +30,7 @@ class ActivationOrchestrator:
         - Trigger Twilio outbound orchestration (placeholder).
         """
         summary = self.gemini_client.summarize_intake(payload.intake)
+        waiting_room_plan = self.regulation_micro_agent.build_waiting_room_plan(payload.intake)
         contacts = self.contact_router.select_contacts(payload)
         self.twilio_client.start_outbound_flow(
             activation_id=payload.activation_id,
@@ -39,4 +43,5 @@ class ActivationOrchestrator:
             summary_text=summary,
             started_at=datetime.now(timezone.utc),
             routed_contacts=contacts,
+            waiting_room_plan=waiting_room_plan,
         )

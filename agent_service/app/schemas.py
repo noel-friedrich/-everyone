@@ -30,9 +30,16 @@ class StartActivationRequest(BaseModel):
     contacts: list[Contact] = Field(default_factory=list)
 
 
+class WaitingRoomPlan(BaseModel):
+    script: str
+    pacing: Literal["slow", "steady", "direct"]
+    technique: Literal["breathing", "grounding", "reassurance", "reset", "presence"]
+
+
 class StartActivationResponse(BaseModel):
     activation_id: str
     status: Literal["accepted"]
     summary_text: str
     started_at: datetime
     routed_contacts: list[Contact] = Field(default_factory=list)
+    waiting_room_plan: WaitingRoomPlan | None = None
