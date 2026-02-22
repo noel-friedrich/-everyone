@@ -10,14 +10,16 @@ class AgentServiceClient
     @timeout_seconds = timeout_seconds
   end
 
-  def start_activation(activation_id:, user_id:, intake:)
+  def start_activation(activation_id:, user_id:, intake:, escalation_level: "low", contacts: [])
     uri = URI.parse("#{@base_url}/v1/activations/start")
     request = Net::HTTP::Post.new(uri)
     request["Content-Type"] = "application/json"
     request.body = {
       activation_id: activation_id,
       user_id: user_id,
-      intake: intake
+      escalation_level: escalation_level,
+      intake: intake,
+      contacts: contacts
     }.to_json
 
     response = Net::HTTP.start(

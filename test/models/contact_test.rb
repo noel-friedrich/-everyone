@@ -13,13 +13,13 @@ class ContactTest < ActiveSupport::TestCase
     assert_includes contact.errors[:phone_e164], "is invalid"
   end
 
-  test "rejects tier outside 1..3" do
+  test "rejects invalid priority enum value" do
     contact = contacts(:one).dup
     contact.phone_e164 = "+353861119999"
-    contact.tier = 4
+    contact.priority = 9
 
     assert_not contact.valid?
-    assert_includes contact.errors[:tier], "is not included in the list"
+    assert_includes contact.errors[:priority], "is not included in the list"
   end
 
   test "enforces unique phone per user" do

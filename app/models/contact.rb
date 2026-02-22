@@ -8,13 +8,17 @@ class Contact < ApplicationRecord
     confirmed: 1,
     revoked: 2
   }
+  enum :priority, {
+    low: 0,
+    moderate: 1,
+    high: 2
+  }, prefix: true
 
   before_validation :normalize_phone_e164
 
   validates :name, presence: true
   validates :phone_e164, presence: true, format: { with: E164_REGEX }
-  validates :tier, inclusion: { in: [ 1, 2, 3 ] }
-  validates :priority, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
+  validates :priority, inclusion: { in: priorities.keys }
   validates :response_count, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
   validates :miss_count, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
   validates :avg_answer_seconds, numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true

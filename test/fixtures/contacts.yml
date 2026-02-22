@@ -3,7 +3,6 @@ one:
   name: Mum
   phone_e164: +353861112222
   relationship: parent
-  tier: 1
   priority: 0
   active: true
   consent_status: confirmed

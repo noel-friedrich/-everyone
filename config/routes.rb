@@ -13,6 +13,7 @@ Rails.application.routes.draw do
   root "home#index"
   get "studio" => "studio#index", as: :studio
   post "initiate_call" => "home#initiate_call", as: :initiate_call
+  post "initiate_all" => "home#initiate_call", as: :initiate_all
 
   post "twilio/voice/intro" => "twilio_voice#intro", as: :twilio_voice_intro
   post "twilio/voice/accept" => "twilio_voice#accept", as: :twilio_voice_accept

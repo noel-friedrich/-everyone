@@ -23,11 +23,11 @@ class ActivationOrchestrator:
 
         Current template flow:
         - Build context summary from intake.
-        - Select contacts (placeholder).
+        - Select contacts using deterministic routing.
         - Trigger Twilio outbound orchestration (placeholder).
         """
         summary = self.gemini_client.summarize_intake(payload.intake)
-        _contacts = self.contact_router.select_contacts(payload)
+        contacts = self.contact_router.select_contacts(payload)
         self.twilio_client.start_outbound_flow(
             activation_id=payload.activation_id,
             user_id=payload.user_id,
@@ -38,4 +38,5 @@ class ActivationOrchestrator:
             status="accepted",
             summary_text=summary,
             started_at=datetime.now(timezone.utc),
+            routed_contacts=contacts,
         )

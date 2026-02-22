@@ -1,28 +1,62 @@
-require "json"
-require "net/http"
-require "uri"
-
 class HomeController < ApplicationController
   FALLBACK_MESSAGE = "KC needs someone to talk right now.".freeze
-  DEV_PUBLIC_BASE_URL = "https://britany-schizogenetic-luz.ngrok-free.dev".freeze
+  ESCALATION_PRIORITY_ORDER = {
+    "low" => [ 0, 1, 2 ],
+    "moderate" => [ 1, 2, 0],
+    "high" => [ 2, 1, 0 ]
+  }.freeze
   skip_forgery_protection only: :initiate_call
+
   def index; end
 
   def initiate_call
     activation_id = SecureRandom.uuid
+    escalation_level = normalized_escalation_level(params[:escalation_level])
     intake = {
       feeling: params[:feeling].presence || "overwhelmed",
       trigger: params[:trigger].presence || "unspecified",
       urgency: params[:urgency].presence || "high"
     }
     user_id = params[:user_id].presence&.to_i || 1
+    user = User.find(user_id)
+    all_contacts = user.contacts.where(active: true, consent_status: :confirmed).to_a
 
     summary_payload = AgentServiceClient.new.start_activation(
       activation_id: activation_id,
       user_id: user_id,
-      intake: intake
+      intake: intake,
+      escalation_level: escalation_level,
+      contacts: router_contacts_payload(all_contacts)
     )
     summary_text = summary_payload&.dig("summary_text").presence || FALLBACK_MESSAGE
+    ordered_contacts = ordered_contacts_from_router(
+      all_contacts: all_contacts,
+      summary_payload: summary_payload,
+      escalation_level: escalation_level
+    )
+
+    if ordered_contacts.empty?
+      return respond_to do |format|
+        format.html { redirect_to root_path, alert: "No active confirmed contacts for escalation #{escalation_level}." }
+        format.json do
+          render json: {
+            status: "error",
+            error: "no_contacts_for_escalation",
+            activation_id: activation_id,
+            escalation_level: escalation_level
+          }, status: :unprocessable_entity
+        end
+      end
+    end
+
+    room_name = "activation_#{activation_id}"
+    call_results = call_contacts_in_batches(
+      contacts: ordered_contacts,
+      room_name: room_name,
+      caller_name: user.name.presence || "Someone",
+      escalation_level: escalation_level
+    )
+    call_sids = call_results.flat_map { |batch| batch[:results].map { |r| r[:call_sid] } }.compact
 
     Rails.cache.write(
       activation_cache_key(activation_id),
@@ -30,59 +64,40 @@ class HomeController < ApplicationController
         "activation_id" => activation_id,
         "summary_text" => summary_text,
         "accepted_call_sid" => nil,
+        "room_name" => room_name,
+        "escalation_level" => escalation_level,
+        "routed_contact_ids" => ordered_contacts.map(&:id),
+        "call_sids" => call_sids,
         "created_at" => Time.current.iso8601
       },
       expires_in: 30.days
     )
 
-    webhook_base_url = resolved_public_base_url
-    intro_url = build_webhook_url(webhook_base_url, twilio_voice_intro_path(activation_id: activation_id))
-    status_url = build_webhook_url(webhook_base_url, twilio_voice_status_path(activation_id: activation_id))
-
-    if local_base_url?(webhook_base_url)
-      return respond_to do |format|
-        format.html { redirect_to root_path, alert: "PUBLIC_BASE_URL is not set to a public URL. Start ngrok and set PUBLIC_BASE_URL." }
-        format.json do
-          render json: {
-            status: "error",
-            error: "invalid_public_base_url",
-            message: "Twilio needs a public webhook URL. Set PUBLIC_BASE_URL to your ngrok https URL.",
-            debug: {
-              webhook_base_url: webhook_base_url,
-              intro_url: intro_url,
-              status_url: status_url
-            }
-          }, status: :unprocessable_entity
-        end
-      end
-    end
-    Rails.logger.info("twilio_webhook_urls base=#{webhook_base_url} intro=#{intro_url} status=#{status_url}")
-
-    client = Twilio::REST::Client.new(
-      ENV.fetch("TWILIO_ACCOUNT_SID"),
-      ENV.fetch("TWILIO_AUTH_TOKEN")
-    )
-
-    call = client.calls.create(
-      from: ENV.fetch("TWILIO_FROM_NUMBER"),
-      to: ENV.fetch("TEST_NUMBER"),
-      url: intro_url,
-      status_callback: status_url,
-      status_callback_method: "POST",
-      status_callback_event: [ "initiated", "ringing", "answered", "completed" ]
-    )
-
-    Rails.logger.info("call_initiated activation_id=#{activation_id} call_sid=#{call.sid}")
     respond_to do |format|
-      format.html { redirect_to root_path, notice: "Call initiated. SID: #{call.sid}" }
+      format.html { redirect_to root_path, notice: "Activation started. Calling #{ordered_contacts.size} contacts grouped by priority." }
       format.json do
         render json: {
           status: "ok",
           activation_id: activation_id,
-          call_sid: call.sid,
-          summary_text: summary_text
+          summary_text: summary_text,
+          escalation_level: escalation_level,
+          room_name: room_name,
+          routed_contact_ids: ordered_contacts.map(&:id),
+          batches: call_results.map do |batch|
+            {
+              batch_number: batch[:batch_number],
+              escalation_group: batch[:priority_label],
+              contact_ids: batch[:contact_ids],
+              contacts: batch[:results]
+            }
+          end
         }, status: :ok
       end
+    end
+  rescue ActiveRecord::RecordNotFound
+    respond_to do |format|
+      format.html { redirect_to root_path, alert: "User not found." }
+      format.json { render json: { status: "error", error: "user_not_found", user_id: user_id }, status: :not_found }
     end
   rescue KeyError => e
     respond_to do |format|
@@ -92,18 +107,7 @@ class HomeController < ApplicationController
   rescue Twilio::REST::RestError => e
     respond_to do |format|
       format.html { redirect_to root_path, alert: "Twilio error: #{e.message}" }
-      format.json do
-        render json: {
-          status: "error",
-          error: "twilio_error",
-          message: e.message,
-          debug: {
-            webhook_base_url: webhook_base_url,
-            intro_url: intro_url,
-            status_url: status_url
-          }
-        }, status: :bad_gateway
-      end
+      format.json { render json: { status: "error", error: "twilio_error", message: e.message }, status: :bad_gateway }
     end
   end
 
@@ -113,38 +117,89 @@ class HomeController < ApplicationController
     "activation:#{activation_id}"
   end
 
-  def build_webhook_url(base_url, path)
-    "#{base_url.to_s.chomp('/')}#{path}"
+  def normalized_escalation_level(raw_level)
+    raw = raw_level.to_s.strip.downcase
+    return raw if ESCALATION_PRIORITY_ORDER.key?(raw)
+
+    case raw_level.to_i
+    when 1 then "low"
+    when 2 then "moderate"
+    when 3 then "high"
+    else "low"
+    end
   end
 
-  def resolved_public_base_url
-    ENV["PUBLIC_BASE_URL"].presence || ngrok_public_url.presence || development_public_base_url || request.base_url
+  def router_contacts_payload(contacts)
+    contacts.map do |contact|
+      {
+        id: contact.id,
+        priority: contact_priority_value(contact),
+        active: contact.active,
+        preferred_hours_start: contact.preferred_hours_start&.strftime("%H:%M:%S"),
+        preferred_hours_end: contact.preferred_hours_end&.strftime("%H:%M:%S"),
+        timezone: contact.timezone,
+        last_responded_at: contact.last_responded_at,
+        response_count: contact.response_count,
+        miss_count: contact.miss_count
+      }
+    end
   end
 
-  def ngrok_public_url
-    uri = URI.parse("http://127.0.0.1:4040/api/tunnels")
-    response = Net::HTTP.get_response(uri)
-    return nil unless response.is_a?(Net::HTTPSuccess)
+  def ordered_contacts_from_router(all_contacts:, summary_payload:, escalation_level:)
+    ids = Array(summary_payload&.dig("routed_contacts")).map { |contact| contact["id"].to_i }.uniq
+    contacts_by_id = all_contacts.index_by(&:id)
+    ordered = ids.filter_map { |id| contacts_by_id[id] }
+    return ordered if ordered.any?
 
-    data = JSON.parse(response.body)
-    tunnels = Array(data["tunnels"])
-    https_tunnel = tunnels.find { |t| t["public_url"].to_s.start_with?("https://") }
-    https_tunnel&.dig("public_url")
-  rescue StandardError => e
-    Rails.logger.warn("ngrok_url_lookup_failed #{e.class}: #{e.message}")
-    nil
+    priority_order = ESCALATION_PRIORITY_ORDER.fetch(escalation_level)
+    all_contacts
+      .select { |contact| priority_order.include?(contact_priority_value(contact)) }
+      .sort_by do |contact|
+        reliability = reliability_score(contact)
+        recency = contact.last_responded_at&.to_f || -Float::INFINITY
+        priority_rank = priority_order.index(contact_priority_value(contact)) || priority_order.length
+        [ priority_rank, -reliability, -recency, -contact.response_count, contact.id ]
+      end
   end
 
-  def local_base_url?(url)
-    host = URI.parse(url).host
-    host.blank? || [ "localhost", "127.0.0.1", "::1" ].include?(host)
-  rescue URI::InvalidURIError
-    true
+  def reliability_score(contact)
+    attempts = contact.response_count + contact.miss_count
+    return 0.0 if attempts.zero?
+
+    contact.response_count.fdiv(attempts)
   end
 
-  def development_public_base_url
-    return nil unless Rails.env.development?
+  def call_contacts_in_batches(contacts:, room_name:, caller_name:, escalation_level:)
+    service = TwilioService.new
+    ordered_groups = ESCALATION_PRIORITY_ORDER.fetch(escalation_level)
+    priority_groups = contacts.group_by { |contact| contact_priority_value(contact) }
+    requested_order = ordered_groups.select { |priority| priority_groups.key?(priority) }
 
-    DEV_PUBLIC_BASE_URL
+    requested_order.each.with_index(1).map do |priority, batch_number|
+      group_contacts = priority_groups.fetch(priority, [])
+      numbers = group_contacts.map(&:phone_e164)
+      results = service.call_everyone(
+        numbers: numbers,
+        room_name: room_name,
+        caller_name: caller_name
+      )
+
+      {
+        batch_number: batch_number,
+        priority_label: priority_label(priority),
+        contact_ids: group_contacts.map(&:id),
+        results: results
+      }
+    end
+  end
+
+  def contact_priority_value(contact)
+    return contact[:priority] if contact[:priority].is_a?(Integer)
+
+    Contact.priorities.fetch(contact.priority.to_s)
+  end
+
+  def priority_label(priority_value)
+    Contact.priorities.key(priority_value).to_s
   end
 end
