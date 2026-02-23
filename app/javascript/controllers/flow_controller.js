@@ -3,6 +3,7 @@ import { Controller } from "@hotwired/stimulus";
 const SNAKE_COUNT = 16;
 const MOBILE_SNAKE_REDUCTION = 2;
 const MOBILE_BREAKPOINT = 800;
+const MOBILE_HEIGHT_RESIZE_TOLERANCE = 120;
 const TARGET_UPDATES_PER_SECOND = 30;
 const STEP_MS = 1000 / TARGET_UPDATES_PER_SECOND;
 const MAX_CATCHUP_STEPS = 4;
@@ -25,6 +26,8 @@ export default class extends Controller {
 
     this.width = 0;
     this.height = 0;
+    this.lastViewportWidth = 0;
+    this.lastViewportHeight = 0;
     this.snakes = [];
     this.rafId = null;
     this.lastFrameAt = null;
@@ -103,14 +106,32 @@ export default class extends Controller {
 
   resize() {
     const dpr = Math.max(1, window.devicePixelRatio || 1);
-    const isMobile = window.innerWidth < MOBILE_BREAKPOINT;
+    const viewportWidth = Math.floor(window.innerWidth);
+    const viewportHeight = Math.floor(window.innerHeight);
+    const isMobile = viewportWidth < MOBILE_BREAKPOINT;
+
+    // Mobile browsers fire "resize" while scrolling as URL bars collapse/expand.
+    // Ignore height-only changes so the canvas is not reset during scroll.
+    if (
+      this.width > 0 &&
+      isMobile &&
+      viewportWidth === this.lastViewportWidth &&
+      Math.abs(viewportHeight - this.lastViewportHeight) <
+        MOBILE_HEIGHT_RESIZE_TOLERANCE
+    ) {
+      this.lastViewportHeight = viewportHeight;
+      return;
+    }
+
     const snakeCount = Math.max(
       1,
       SNAKE_COUNT - (isMobile ? MOBILE_SNAKE_REDUCTION : 0),
     );
     this.speedMultiplier = isMobile ? 0.6 : 1;
-    this.width = Math.floor(window.innerWidth);
-    this.height = Math.floor(window.innerHeight);
+    this.width = viewportWidth;
+    this.height = viewportHeight;
+    this.lastViewportWidth = viewportWidth;
+    this.lastViewportHeight = viewportHeight;
     this.canvas.width = Math.floor(this.width * dpr);
     this.canvas.height = Math.floor(this.height * dpr);
     this.canvas.style.width = `${this.width}px`;

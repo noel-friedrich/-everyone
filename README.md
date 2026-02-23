@@ -1,97 +1,106 @@
-# README
-
-This README would normally document whatever steps are necessary to get the
-application up and running.
-
-Things you may want to cover:
-
-* Ruby version
-
-* System dependencies
-
-* Configuration
-
-* Database creation
-
-* Database initialization
-
-* How to run the test suite
-
-* Services (job queues, cache servers, search engines, etc.)
-
-* Deployment instructions
-
-* ...
 # @everyone
 
-A simple app that lets you quickly reach your trusted people in different situations (mental health, check-ins, other scenarios).
+> Disclaimer: This project was built during **HackEurope 2026** by an international team of four.
 
-This repo contains the Ruby on Rails backend.
+@everyone helps you reach trusted people quickly in difficult moments.
 
-## What it does (backend)
-- Stores users and their trusted contacts
-- Starts a “session” when a user triggers @everyone
-- Calls multiple contacts at once (first person to pick up gets connected)
-- Sends SMS updates to the other contacts
+Live site: **https://at-everyone.help**
 
-## Tech
-- Ruby on Rails (API / backend)
-- Twilio (Voice + SMS)
+## What This Project Is
 
-## Requirements
-- Ruby (match the version in `.ruby-version`)
+@everyone is a rapid-contact web app designed for urgent personal situations (mental health crises, safety check-ins, and similar moments where reaching someone fast matters).
+
+From the landing page experience:
+- You set up a trusted contact circle.
+- You can trigger a one-tap alert flow.
+- Confirmed contacts are called in parallel.
+- The first person to accept gets connected while others can be stopped.
+- Contacts do not need to install an app (phone + SMS/call capability is enough).
+
+## Product Areas
+
+- **Homepage (`/`)**
+  - Product explanation, FAQ, and contact form UI.
+- **Studio (`/studio`)**
+  - Manage trusted contacts and consent status (confirmed / pending / declined).
+- **Live Alert (`/alert`)**
+  - Trigger calls, monitor live call states, and optionally auto-cancel remaining calls after first acceptance.
+- **Consent flow (`/consent`)**
+  - Handles contact opt-in / opt-out actions.
+
+## Important Warning (Twilio Disabled)
+
+Twilio access has been disabled to avoid ongoing operating costs.
+
+That means:
+- Real outbound calling no longer works.
+- Real SMS sending no longer works.
+- Twilio-dependent alert behavior is preserved in code, but not active in production without valid Twilio credentials and billing.
+
+## Tech Stack
+
+- **Backend:** Ruby on Rails
+- **Frontend:** ERB + Stimulus controllers + vanilla JavaScript/CSS
+- **Database:** SQLite (development)
+- **Telephony / Messaging integration:** Twilio (currently disabled)
+- **Realtime updates:** Server-Sent Events (SSE) stream for live alert session status
+
+## How It Works (Technical Outline)
+
+1. A user configures trusted contacts in Studio.
+2. Contacts are tracked with consent states (confirmed/pending/declined).
+3. Triggering an alert creates a call session via API endpoints.
+4. The backend would place parallel outbound Twilio calls and track each contact status.
+5. Call lifecycle callbacks update session/contact state in the database.
+6. The alert UI consumes session updates (including SSE stream updates) to visualize progress in real time.
+7. If enabled, the backend can cancel remaining calls after the first accepted response.
+
+Relevant backend areas include:
+- `app/controllers/api/calls_controller.rb`
+- `app/services/twilio_service.rb`
+- `app/controllers/twilio_voice_controller.rb`
+- `config/routes.rb`
+
+## Local Development
+
+### Requirements
+
+- Ruby version from `.ruby-version`
 - Bundler
-- Twilio account + phone number
+- SQLite
 
-## Setup (local)
+### Setup
 
-1. Install gems:
-   `bundle install`
-2. Create `.env` in the project root (already gitignored) with:
-   `TWILIO_ACCOUNT_SID=your_sid`
-   `TWILIO_AUTH_TOKEN=your_token`
-   `TEST_NUMBER=+15551234567`
-   `TWILIO_FROM_NUMBER=+15557654321`
+1. Install dependencies:
+   ```bash
+   bundle install
+   ```
+2. Prepare database:
+   ```bash
+   bundle exec rails db:prepare
+   ```
 3. Start the app:
-   `bin/dev`
+   ```bash
+   bin/dev
+   ```
 
-With `dotenv-rails` installed, Rails automatically loads `.env` in development and test.
+### Optional Twilio Environment (if you re-enable calling)
 
-## Database (SQLite)
+Create a `.env` file with values like:
 
-This app uses SQLite in local development and test:
-- `storage/development.sqlite3`
-- `storage/test.sqlite3`
-
-Prepare the DB:
-- `bundle exec rails db:prepare`
-
-Open a SQL shell (development):
-- `sqlite3 storage/development.sqlite3`
-
-Useful SQLite commands:
-- `.tables`
-- `.schema contacts`
-- `.schema users`
-- `.mode column`
-- `.headers on`
-- `.quit`
-
-Example queries:
-
-```sql
-SELECT id, name, email FROM users;
-
-SELECT id, user_id, name, phone_e164, tier, priority, active, consent_status
-FROM contacts
-ORDER BY tier ASC, priority ASC;
-
-SELECT tier, COUNT(*) AS count
-FROM contacts
-WHERE active = 1
-GROUP BY tier
-ORDER BY tier ASC;
+```env
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+TWILIO_FROM_NUMBER=...
+TWILIO_API_KEY=...
+TWILIO_API_SECRET=...
+TWILIO_TWIML_APP_SID=...
+PUBLIC_BASE_URL=http://localhost:3000
 ```
 
-You can also use Rails runner for quick checks:
-- `bundle exec rails runner 'puts Contact.where(active: true).order(:tier, :priority).pluck(:name, :phone_e164)'`
+Without valid Twilio credentials + active billing, call/SMS features will fail.
+
+## Contact
+
+For project inquiries:
+**noel.friedrich@outlook.de**
