@@ -14,6 +14,8 @@ From the landing page experience:
 - You set up a trusted contact circle.
 - You can trigger a one-tap alert flow.
 - Confirmed contacts are called in parallel.
+- In the meantime, the app gets context on user's situation.
+- This info is then summarised by Gemini and fed to responder for context.
 - The first person to accept gets connected while others can be stopped.
 - Contacts do not need to install an app (phone + SMS/call capability is enough).
 
@@ -44,6 +46,7 @@ That means:
 - **Database:** SQLite (development)
 - **Telephony / Messaging integration:** Twilio (currently disabled)
 - **Realtime updates:** Server-Sent Events (SSE) stream for live alert session status
+- **Context summary:** Gemini APIs (currently disabled)
 
 ## How It Works (Technical Outline)
 
