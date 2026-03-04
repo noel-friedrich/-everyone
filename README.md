@@ -87,7 +87,7 @@ Relevant backend areas include:
    bin/dev
    ```
 
-### Optional Twilio Environment (if you re-enable calling)
+### Optional Environment (if you re-enable calling)
 
 Create a `.env` file with values like:
 
@@ -99,6 +99,7 @@ TWILIO_API_KEY=...
 TWILIO_API_SECRET=...
 TWILIO_TWIML_APP_SID=...
 PUBLIC_BASE_URL=http://localhost:3000
+GEMINI_API_KEY=...
 ```
 
 Without valid Twilio credentials + active billing, call/SMS features will fail.
