@@ -41,7 +41,7 @@ That means:
 
 ## Tech Stack
 
-- **Backend:** Ruby on Rails
+- **Backend:** Ruby on Rails, Python (Gemini, FastAPIs)
 - **Frontend:** ERB + Stimulus controllers + vanilla JavaScript/CSS
 - **Database:** SQLite (development)
 - **Telephony / Messaging integration:** Twilio (currently disabled)
